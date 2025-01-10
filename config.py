@@ -1,0 +1,250 @@
+from pathlib import Path
+import yaml
+from datetime import datetime
+from typing import Dict, Any, TYPE_CHECKING
+import os
+from dotenv import load_dotenv
+
+if TYPE_CHECKING:
+    from database_manager import DatabaseManager
+
+class Config:
+    def __init__(self):
+        # Load environment variables
+        load_dotenv()
+        self.env = self._load_environment()
+        
+        # Set up paths
+        self.base_path = Path(__file__).parent
+        self.data_dir = self.base_path / "data"
+        self.data_dir.mkdir(exist_ok=True)
+        
+        # Initialize components
+        self._metadata = None
+        self._db_manager: 'DatabaseManager' = None
+        
+        # Load or initialize config
+        self.load_config()
+        
+        # Verify required files
+        self._verify_required_files()
+        
+        # Add technique categories mapping for easy access
+        self.technique_categories = {
+            'geometry': self.metadata['parameters']['creative_core']['mathematical_concepts']['geometry'],
+            'motion': self.metadata['parameters']['creative_core']['mathematical_concepts']['motion'],
+            'patterns': self.metadata['parameters']['creative_core']['mathematical_concepts']['patterns']
+        }
+    
+    def _verify_required_files(self):
+        """Verify all required files exist"""
+        required_files = [
+            self.paths['template'],
+            *self.paths['docs'].values()
+        ]
+        
+        for path in required_files:
+            if not path.exists():
+                raise FileNotFoundError(f"Required file not found: {path}")
+    
+    @property
+    def db_manager(self) -> 'DatabaseManager':
+        """Get database manager instance (lazy initialization)"""
+        if self._db_manager is None:
+            from database_manager import DatabaseManager
+            self._db_manager = DatabaseManager(self)
+        return self._db_manager
+    
+    @property
+    def database_path(self) -> Path:
+        """Get path to SQLite database"""
+        return self.data_dir / "database.db"
+    
+    @property
+    def api_key(self) -> str:
+        """Get OpenAI API key"""
+        return self.env['OPENAI_API_KEY']
+    
+    @property
+    def metadata(self) -> Dict[str, Any]:
+        """Get system metadata"""
+        return self._metadata
+    
+    @property
+    def paths(self) -> Dict[str, Path]:
+        """Get important file paths"""
+        return {
+            'template': self.base_path / "auto.pde",
+            'docs': {
+                'history': self.base_path / "docs" / "history.md"
+            }
+        }
+    
+    def initialize_metadata(self):
+        """Initialize metadata with expanded technique categories"""
+        self._metadata = {
+            'current_version': 0,
+            'last_updated': datetime.now().isoformat(),
+            'parameters': {
+                'system': {
+                    'base_resolution': [800, 800],
+                    'frame_rate': 60,
+                    'total_frames': 360,
+                    'render_quality': 'P2D'
+                },
+                'generation': {
+                    'ai_parameters': {
+                        'model': 'random',
+                        'default_model': 'o1-mini',
+                        'available_models': ['o1-mini', '4o'],
+                        'model_weights': {
+                            'o1-mini': 0.5,
+                            '4o': 0.5
+                        }
+                    },
+                    'constraints': {
+                        'max_elements': 1000,
+                        'min_frame_time': 16
+                    }
+                },
+                'creative_core': {
+                    'mathematical_concepts': {
+                        'geometry': [
+                            'circle_packing',
+                            'voronoi_diagrams',
+                            'delaunay_triangulation',
+                            'fibonacci_spiral',
+                            'lissajous_curves',
+                            'cardioids',
+                            'superellipse',
+                            'hypocycloid',
+                            'rose_curves',
+                            'phyllotaxis',
+                            'polygon_morphing',
+                            'spirograph',
+                            'golden_ratio',
+                            'tesselation',
+                            'meander_patterns',
+                            'star_polygons',
+                            'truchet_tiles',
+                            'hyperbolic_tiling',
+                            'kaleidoscopic_transforms',
+                            'l_system_fractals',
+                            'strange_attractors',
+                            'chladni_patterns',
+                            'dla_growth',
+                            'procedural_terrain'
+                        ],
+                        'motion': [
+                            'harmonic_motion',
+                            'wave_interference',
+                            'flow_fields',
+                            'parametric_motion',
+                            'brownian_motion',
+                            'particle_systems',
+                            'spring_physics',
+                            'orbital_motion',
+                            'pendulum_motion',
+                            'circular_motion',
+                            'wave_propagation',
+                            'perlin_noise_motion',
+                            'elastic_motion',
+                            'spiral_motion',
+                            'oscillation',
+                            'lerp_transitions',
+                            'flocking_boids',
+                            'swarm_intelligence',
+                            'advanced_physics',
+                            'agent_based_drawing',
+                            'temporal_shifts',
+                            'emergent_behavior',
+                            'collective_motion'
+                        ],
+                        'patterns': [
+                            'cellular_automata',
+                            'fractals',
+                            'recursive_patterns',
+                            'stroke_variations',
+                            'reaction_diffusion',
+                            'noise_landscapes',
+                            'moiré_patterns',
+                            'tiling_systems',
+                            'interference_patterns',
+                            'mandala_patterns',
+                            'maze_generation',
+                            'dot_patterns',
+                            'grid_deformation',
+                            'symmetry_patterns',
+                            'line_weaving',
+                            'halftone_patterns',
+                            'l_systems',
+                            'pixel_sorting',
+                            'glitch_effects',
+                            'feedback_loops',
+                            'blend_modes',
+                            'color_harmonies',
+                            'resonance_patterns'
+                        ]
+                    }
+                },
+                'analysis': {
+                    'visual': {
+                        'edge_threshold': [100, 200],
+                        'feature_weights': {
+                            'edge_density': 0.5,
+                            'contrast': 0.5
+                        }
+                    },
+                    'aesthetic': {
+                        'weights': {
+                            'balance': 0.6,
+                            'contrast': 0.4
+                        }
+                    },
+                    'motion': {
+                        'flow_weight': 0.7,
+                        'coverage_weight': 0.3
+                    }
+                }
+            }
+        }
+        
+        self.save_metadata()
+    
+    def save_metadata(self):
+        """Save metadata to YAML file"""
+        with open(self.data_dir / "metadata.yaml", 'w') as f:
+            yaml.safe_dump(self._metadata, f)
+    
+    def load_config(self):
+        """Load or initialize configuration"""
+        try:
+            metadata_path = self.data_dir / "metadata.yaml"
+            if metadata_path.exists():
+                with open(metadata_path) as f:
+                    self._metadata = yaml.safe_load(f)
+                if not self._metadata:
+                    self.initialize_metadata()
+            else:
+                self.initialize_metadata()
+        except Exception as e:
+            print(f"Error loading config: {e}")
+            self.initialize_metadata()
+    
+    def get_next_version(self) -> int:
+        """Get next version number"""
+        if not self._metadata:
+            self.initialize_metadata()
+        
+        next_version = self._metadata['current_version'] + 1
+        self._metadata['current_version'] = next_version
+        self.save_metadata()
+        
+        return next_version
+    
+    def _load_environment(self) -> Dict[str, str]:
+        """Load required environment variables"""
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable not found")
+        return {'OPENAI_API_KEY': api_key}
