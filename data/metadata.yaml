@@ -1,4 +1,4 @@
-current_version: 2292
+current_version: 2295
 last_updated: '2025-01-10T18:32:21.959714'
 parameters:
   analysis:
@@ -98,12 +98,12 @@ parameters:
           avg_score: 58.275662206410985
           uses: 18
         o1:
-          avg_score: 60.13496084195378
-          uses: 22
+          avg_score: 59.6927430603173
+          uses: 24
         o1-mini:
-          avg_score: 57.560284360305396
-          uses: 17
-      last_used_model: o1
+          avg_score: 57.04872294436286
+          uses: 19
+      last_used_model: o1-mini
     constraints:
       max_elements: 1000
       min_frame_time: 16

@@ -38,7 +38,7 @@ if (-not (Test-Path $RenderPath)) {
 }
 
 # Copy auto.pde to render directory
-$sketchCopy = Join-Path $RenderPath "sketch_v$renderVersion.pde"
+$sketchCopy = Join-Path $RenderPath "render_v$renderVersion.pde"
 try {
     if (-not (Test-Path $sketchPath)) {
         Write-Error "Source sketch file not found: $sketchPath"
@@ -166,9 +166,14 @@ try {
     # Process video if frames exist
     $frames = Get-ChildItem -Path $RenderPath -Filter "frame-*.png"
     if ($frames.Count -ge 360) {
-        # Clean up compiled files
+        # Clean up compiled files but preserve PDE
+        Write-Host "Cleaning up compiled files (preserving PDE)..."
         Remove-Item -Path "$RenderPath\source" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "$RenderPath\*.class" -Force -ErrorAction SilentlyContinue
+        
+        # Re-copy PDE file to ensure it exists
+        Write-Host "Re-copying PDE file to ensure preservation..."
+        Copy-Item -Path $sketchPath -Destination $sketchCopy -Force
         
         $outputFile = Join-Path $RenderPath "output.mp4"
         $version = $RenderPath -replace '.*_v(\d+)$','$1'
@@ -203,7 +208,6 @@ try {
     Write-Host "Cleaning up compiled files..."
     Remove-Item -Path "$RenderPath\source" -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -Path "$RenderPath\*.class" -Force -ErrorAction SilentlyContinue
-    # Note: We're no longer cleaning up the PDE file to preserve it as a snapshot
     
     # Final cleanup of processes
     Get-Process | Where-Object { $_.ProcessName -like "*processing-java*" -or $_.ProcessName -like "*java*" } | 
@@ -215,5 +219,10 @@ try {
                 Write-Host "Process already terminated: $($_.ProcessName)"
             }
         }
+        
+    # Save PDE snapshot after all cleanup is done
+    $sketchCopy = Join-Path $RenderPath "render_v$renderVersion.pde"
+    Write-Host "Saving PDE snapshot..."
+    Copy-Item -Path $sketchPath -Destination $sketchCopy -Force
 }
   
