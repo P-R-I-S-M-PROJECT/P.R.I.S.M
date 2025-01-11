@@ -1,3 +1,8 @@
+# Processing Files
+auto.pde
+out/
+*.autosave
+
 # Python
 __pycache__/
 *.py[cod]
@@ -83,6 +88,3 @@ web/
 
 # scripts
 scripts/
-
-#auto
-auto.pde
