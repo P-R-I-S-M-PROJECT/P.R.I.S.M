@@ -214,7 +214,7 @@ class ProcessingGenerator:
     
     # === Code Processing and Validation ===
     def _clean_code(self, code: str, version: int) -> str:
-        """Clean and insert code into template"""
+        """Clean and insert code into template with proper structure"""
         try:
             # Remove markdown artifacts
             code = re.sub(r'^```.*?\n', '', code)
@@ -225,41 +225,54 @@ class ProcessingGenerator:
             code = code.encode('ascii', 'ignore').decode()  # Remove non-ASCII chars
             code = re.sub(r'[^\x00-\x7F]+', '', code)  # Additional non-ASCII cleanup
             
+            # Extract just the user's creative code
+            user_code = self._extract_user_code(code)
+            if not user_code:
+                self.log.error("Failed to extract user code")
+                return None
+            
             # Debug log the cleaned code
-            self.log.debug(f"\nCleaned code before template insertion:\n{code}\n")
+            self.log.debug(f"\nCleaned code before template insertion:\n{user_code}\n")
             
             # Basic validation
-            is_valid, error = self._validate_creative_code(code)
+            is_valid, error = self._validate_creative_code(user_code)
             if not is_valid:
                 self.log.error(f"Invalid code: {error}")
                 return None
             
-            # Insert into template
+            # Get template and log it
             template = self._build_template_with_config(version)
-            # Debug log the template
             self.log.debug(f"\nTemplate before insertion:\n{template}\n")
             
-            # More careful template insertion
-            parts = template.split("// YOUR CREATIVE CODE GOES HERE")
-            if len(parts) != 2:
-                self.log.error("Template missing insertion point")
-                return None
+            # Insert user code at the correct location
+            final_code = template.replace("// YOUR CREATIVE CODE GOES HERE", user_code)
             
-            before = parts[0]
-            after = parts[1].split("// END OF YOUR CREATIVE CODE")[1]
+            # Debug log the final merged code
+            self.log.debug(f"\nFinal merged code:\n{final_code}\n")
             
-            # Ensure proper indentation
-            indented_code = "\n".join("  " + line for line in code.splitlines())
-            
-            result = f"{before}// YOUR CREATIVE CODE GOES HERE\n{indented_code}\n  // END OF YOUR CREATIVE CODE{after}"
-            
-            # Debug log the final result
-            self.log.debug(f"\nFinal merged code:\n{result}\n")
-            
-            return result
+            return final_code
             
         except Exception as e:
             self.log.error(f"Error cleaning code: {e}")
+            return None
+            
+    def _extract_user_code(self, code: str) -> Optional[str]:
+        """Extract user's creative code from between markers"""
+        try:
+            # Split on markers
+            parts = code.split("// YOUR CREATIVE CODE GOES HERE")
+            if len(parts) < 2:
+                return code.strip()  # Return whole code if no markers
+            
+            code = parts[1]
+            parts = code.split("// END OF YOUR CREATIVE CODE")
+            if len(parts) < 1:
+                return code.strip()
+                
+            return parts[0].strip()
+            
+        except Exception as e:
+            self.log.error(f"Error extracting user code: {e}")
             return None
     
     # === Prompt Building ===
@@ -334,38 +347,42 @@ Please fix these issues and return the corrected code."""
             self.log.error(f"Failed to save code: {e}")
     
     def _build_template_with_config(self, version: int) -> str:
-        """Build Processing template with version-specific config"""
-        return f"""void setup() {{
-          size(800, 800);
-          frameRate(60);
-          smooth();
+        """Build Processing template with proper code structure"""
+        return f"""// === USER'S CREATIVE CODE ===
+// YOUR CREATIVE CODE GOES HERE
+// END OF YOUR CREATIVE CODE
+
+// === SYSTEM FRAMEWORK ===
+void setup() {{
+    size(800, 800);
+    frameRate(60);
+    smooth();
+    initSketch();  // Initialize user's sketch
+}}
+
+final int totalFrames = 360;
+boolean hasError = false;
+
+void draw() {{
+    try {{
+        background(0);
+        stroke(255);  // Default stroke but can be changed
+        float progress = float(frameCount % totalFrames) / totalFrames;
+        translate(width/2, height/2);
+        
+        runSketch(progress);  // Run user's sketch with current progress
+        
+        String renderPath = "renders/render_v{version}";
+        saveFrame(renderPath + "/frame-####.png");
+        if (frameCount >= totalFrames) {{
+            exit();
         }}
-
-        final int totalFrames = 360;
-        boolean hasError = false;
-
-        void draw() {{
-          try {{
-            background(0);
-            stroke(255);  // Default stroke but can be changed
-            float progress = float(frameCount % totalFrames) / totalFrames;
-            translate(width/2, height/2);
-            
-            // YOUR CREATIVE CODE GOES HERE
-            
-            // END OF YOUR CREATIVE CODE
-            
-            String renderPath = "renders/render_v{version}";
-            saveFrame(renderPath + "/frame-####.png");
-            if (frameCount >= totalFrames) {{
-                exit();
-            }}
-          }} catch (Exception e) {{
-              println("Error in draw(): " + e.toString());
-              hasError = true;
-              exit();
-          }}
-        }}"""
+    }} catch (Exception e) {{
+        println("Error in draw(): " + e.toString());
+        hasError = true;
+        exit();
+    }}
+}}"""
     
     def _update_render_path(self, code: str, version: int) -> str:
         """Update render path in code"""
