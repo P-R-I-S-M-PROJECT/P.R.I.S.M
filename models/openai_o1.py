@@ -59,9 +59,19 @@ Just remember to use Processing's Java-style syntax as your medium."""
                 self.log.error("No response generated from AI")
                 return None
                 
-            # Log the raw response
+            # Log the raw response first (this is safe)
             raw_content = response.choices[0].message.content
             self.log.debug(f"\n=== AI RESPONSE ===\n{raw_content}\n==================\n")
+            
+            # Then try to log any available metadata
+            self.log.debug("\n=== RESPONSE METADATA ===")
+            try:
+                self.log.debug(f"Model: {response.model}")
+                self.log.debug(f"Usage: {response.usage}")
+                self.log.debug(f"Created: {response.created}")
+            except AttributeError as e:
+                self.log.debug(f"Some metadata not available: {e}")
+            self.log.debug("==================\n")
             
             code = self._extract_code_from_response(raw_content)
             if not code:
@@ -71,9 +81,21 @@ Just remember to use Processing's Java-style syntax as your medium."""
             # Log the extracted code
             self.log.debug(f"\n=== EXTRACTED CODE ===\n{code}\n==================\n")
             
+            # Validate creative code first
+            is_valid, error_msg = self.validate_creative_code(code)
+            if not is_valid:
+                self.log.debug(f"\n=== VALIDATION ERROR ===\nCreative validation failed: {error_msg}\n==================\n")
+                raise ValueError(f"Creative validation: {error_msg}")
+            
             # Convert any remaining JavaScript syntax to Processing
             code = self._convert_to_processing(code)
-            return code if self._is_safe_code(code) else None
+            
+            # Final safety check
+            if not self._is_safe_code(code):
+                self.log.debug("\n=== VALIDATION ERROR ===\nFailed final safety check\n==================\n")
+                return None
+                
+            return code
             
         except Exception as e:
             self.log.error(f"AI generation error: {str(e)}")
@@ -93,15 +115,34 @@ Just remember to use Processing's Java-style syntax as your medium."""
         pattern_techniques = self._get_random_techniques_from_category('patterns', 3)
         
         return f"""=== PROCESSING SKETCH GENERATOR ===
-Create an evolving visual artwork that explores form, motion, and pattern.
+Create an evolving visual artwork that explores form, motion, pattern.
 Choose your approach thoughtfully - not every piece needs to use every technique.
 
-=== CRITICAL REQUIREMENTS ===
-• Use Processing (Java) syntax, NOT JavaScript
-• Use ASCII characters only in code and comments (no special characters like °, ©, etc.)
+=== SYSTEM FRAMEWORK (Already Handled) ===
+The following is automatically handled by the system - DO NOT include these in your code:
+• Canvas setup: size(800, 800)
+• Frame rate: 60fps for 6-second loop
+• Origin translation: translate(width/2, height/2)
+• Background clearing: background(0)
+• Progress variable: float progress = frameCount/totalFrames
+• Frame saving and exit handling
+
+=== YOUR CODE REQUIREMENTS ===
+Your code will be inserted into a template that handles the framework above.
+In your code snippet:
+• Use the provided 'progress' variable (0.0 to 1.0) for animations
+• Keep elements under ~1000 and nesting shallow (≤2 loops)
 • Initialize all variables when declaring them
-• Keep code clean and efficient
 • Use RGB values for colors (e.g., stroke(255, 0, 0) for red)
+• Use ASCII characters only (no special characters like °, ©, etc.)
+
+=== WHAT NOT TO INCLUDE ===
+These are handled by the system - do not declare or use them in your snippet:
+• void setup() or draw()
+• size(), frameRate()
+• background()
+• translate() - coordinates are already centered
+• The 'progress' variable (already provided)
 
 === CREATIVE DIRECTION ===
 • Pick a clear creative direction for this piece
@@ -115,18 +156,6 @@ Choose your approach thoughtfully - not every piece needs to use every technique
   - Or your own unique approach
 • Let your chosen direction guide your technical choices
 {f"• Try something different than: {', '.join(avoid_patterns)}" if avoid_patterns else ""}
-
-Return ONLY the creative code between these markers:
-// YOUR CREATIVE CODE GOES HERE
-// END OF YOUR CREATIVE CODE
-
-=== ESSENTIAL FRAMEWORK ===
-• Seamless 6-second loop (360 frames at 60fps)
-• Canvas: 800x800, origin at center (0,0)
-• Use the provided 'progress' variable (0.0 to 1.0) for all animations
-• Background and transforms handled outside
-• Keep elements under ~1000 and nesting shallow (≤2 loops)
-• DO NOT declare: progress, setup(), draw(), background(), translate(), size(), frameRate()
 
 === CANVAS TREATMENT ===
 Feel free to fill the entire canvas with your artwork. While the background starts black, you can:
@@ -176,8 +205,11 @@ Pattern & Texture:
 • {', '.join(pattern_techniques)}
 • Build evolving pattern systems
 • Create layered visual textures
-
-Let your creativity guide you—these are just starting points for your exploration."""
+Let your creativity guide you—these are just starting points for your exploration.*
+=== IMPORTANT: CODE FORMAT ===
+Return ONLY your creative code between these markers:
+// YOUR CREATIVE CODE GOES HERE
+// END OF YOUR CREATIVE CODE"""
 
     def _get_avoid_patterns(self, recent_patterns, historical_techniques, max_avoid=5) -> List[str]:
         """Helper method to build list of patterns to avoid"""
@@ -209,81 +241,129 @@ Let your creativity guide you—these are just starting points for your explorat
         return random.sample(techniques, count)
 
     def _extract_code_from_response(self, content: str) -> Optional[str]:
-        """Extract and clean code from AI response"""
+        """Extract and clean code from AI response, separating global and draw code"""
         try:
             # Clean special characters and ensure ASCII compatibility first
-            content = content.encode('ascii', 'ignore').decode()  # Remove non-ASCII chars
-            content = re.sub(r'[^\x00-\x7F]+', '', content)  # Additional non-ASCII cleanup
+            content = content.encode('ascii', 'ignore').decode()
+            content = re.sub(r'[^\x00-\x7F]+', '', content)
             
-            if "// YOUR CREATIVE CODE GOES HERE" not in content:
-                self.log.debug("No code markers found, treating entire response as code")
-                return content.strip()
+            # Remove ALL backticks and language markers
+            content = re.sub(r'```\w*\n?', '', content)
+            content = content.replace('```', '')
             
-            code_parts = content.split("// YOUR CREATIVE CODE GOES HERE")
-            if len(code_parts) < 2:
-                self.log.debug("Could not split on start marker")
-                return None
+            # Extract code between markers
+            code = content
+            
+            # Look for function definitions and class definitions
+            global_code = []
+            draw_code = []
+            
+            lines = code.split('\n')
+            in_function = False
+            function_buffer = []
+            
+            for line in lines:
+                stripped = line.strip()
+                # Check for function or class definition start
+                if re.match(r'\s*(void|class)\s+\w+.*{?\s*$', stripped):
+                    in_function = True
+                    function_buffer = [line]
+                    continue
                 
-            code = code_parts[1]
-            end_parts = code.split("// END OF YOUR CREATIVE CODE")
-            if len(end_parts) < 1:
-                self.log.debug("Could not split on end marker")
-                return None
-                
-            extracted = end_parts[0].strip()
-            if not extracted:
-                self.log.debug("Extracted code is empty")
-                return None
-                
-            return extracted
+                if in_function:
+                    function_buffer.append(line)
+                    if '}' in line and line.strip() == '}':
+                        in_function = False
+                        global_code.extend(function_buffer)
+                        function_buffer = []
+                else:
+                    if stripped and not stripped.startswith('//'):
+                        draw_code.append(line)
+            
+            # Format the final code blocks
+            global_block = '\n'.join(global_code)
+            draw_block = '\n'.join(draw_code)
+            
+            return f"""// YOUR GLOBAL CODE GOES HERE
+{global_block}
+// END OF GLOBAL CODE
+
+// YOUR DRAW CODE GOES HERE
+{draw_block}
+// END OF DRAW CODE"""
             
         except Exception as e:
             self.log.error(f"Error extracting code: {str(e)}")
             return None
 
-    def _is_safe_code(self, code: str) -> bool:
-        """Check for forbidden elements in generated code"""
-        forbidden_terms = ['void', 'setup(', 'draw(', 'background(', 
-                    'translate(', 'size(', 'framerate(', 'static']
-        return not any(term in code.lower() for term in forbidden_terms)
+    def _extract_between_markers(self, code: str, start_marker: str, end_marker: str) -> str:
+        """Extract code between markers for validation"""
+        try:
+            parts = code.split(start_marker)
+            if len(parts) < 2:
+                return code
+            code = parts[1]
+            parts = code.split(end_marker)
+            if len(parts) < 1:
+                return code
+            return parts[0].strip()
+        except Exception as e:
+            self.log.error(f"Error extracting between markers: {e}")
+            return code
 
     def validate_creative_code(self, code: str) -> tuple[bool, str]:
         """Validate creative code for forbidden elements"""
         if not code.strip():
             return False, "Empty code"
         
+        # Extract just the user's code portion
+        user_code = self._extract_between_markers(
+            code,
+            "// YOUR CREATIVE CODE GOES HERE",
+            "// END OF YOUR CREATIVE CODE"
+        )
+        
+        # Only forbid system-level functions and declarations
         forbidden = {
-            'void': 'Contains function definition',
             'setup(': 'Contains setup()',
             'draw(': 'Contains draw()',
             'background(': 'Contains background()',
-            'translate(': 'Contains translate()',
             'size(': 'Contains size()',
             'frameRate(': 'Contains frameRate()',
             'final ': 'Contains final declaration'
         }
         
+        # Only check for absolute translations that would re-center the origin
+        for line in user_code.split('\n'):
+            line = line.strip()
+            if 'translate(width/2' in line or 'translate( width/2' in line or 'translate(width / 2' in line:
+                return False, "Contains origin re-centering - coordinates are already centered"
+            if 'translate(height/2' in line or 'translate( height/2' in line or 'translate(height / 2' in line:
+                return False, "Contains origin re-centering - coordinates are already centered"
+        
         for term, error in forbidden.items():
-            if term in code:
+            if term in user_code:
                 return False, error
         
         return True, None
 
     def validate_core_requirements(self, code: str) -> tuple[bool, str]:
         """Validate only essential Processing code requirements"""
+        # Only validate the template structure, not the user code portion
         required_structure = [
             (r'void setup\(\)\s*{[^}]*size\(800,\s*800\)[^}]*}', "setup() function modified"),
+            (r'// YOUR GLOBAL CODE GOES HERE.*// END OF GLOBAL CODE', "Global code markers missing"),
             (r'void draw\(\)\s*{.*background\(0\).*translate\(width/2,\s*height/2\)', "draw() function header modified"),
+            (r'// YOUR DRAW CODE GOES HERE.*// END OF DRAW CODE', "Draw code markers missing"),
             (r'String\s+renderPath\s*=\s*"renders/render_v\d+"', "renderPath declaration missing/modified"),
-            (r'saveFrame\(renderPath\s*\+\s*"/frame-####\.png"\)', "saveFrame call missing/modified"),
-            (r'// YOUR CREATIVE CODE GOES HERE.*// END OF YOUR CREATIVE CODE', "Creative code markers missing")
+            (r'saveFrame\(renderPath\s*\+\s*"/frame-####\.png"\)', "saveFrame call missing/modified")
         ]
         
         for pattern, error in required_structure:
             if not re.search(pattern, code, re.DOTALL):
                 return False, error
             
-        return True, None 
+        return True, None
 
     def _convert_to_processing(self, code: str) -> str:
         """Convert JavaScript syntax to Processing syntax"""
@@ -314,3 +394,39 @@ Let your creativity guide you—these are just starting points for your explorat
             code = code.replace(js, proc)
         
         return code 
+
+    def _is_safe_code(self, code: str) -> bool:
+        """Strict validation of Processing syntax"""
+        errors = []
+        
+        # Extract just the user's code portion
+        user_code = self._extract_between_markers(
+            code,
+            "// YOUR CREATIVE CODE GOES HERE",
+            "// END OF YOUR CREATIVE CODE"
+        )
+        
+        # Check for JavaScript syntax only in user's code portion
+        js_patterns = [
+            (r'\b(const|let|var)\s+\w+\s*=', "Use 'float' or 'int' instead of JavaScript keywords (const/let/var)"),
+            (r'for\s*\(\s*(let|const)\s+\w+', "Use 'int' or 'float' in for loops, not JavaScript keywords"),
+            (r'color\(([\'"]#[0-9a-fA-F]+[\'"]\))', "Use RGB values instead of hex codes: color(255, 0, 0)"),
+            (r'\b(push|pop)\s*\(\s*\)', "Use pushMatrix()/popMatrix() instead of push()/pop()"),
+            (r'createVector\s*\(', "Use 'new PVector()' instead of createVector()"),
+            (r'function\s+\w+\s*\(', "Functions must be declared outside creative code block"),
+            (r'\bstatic\s+\w+', "Do not use static variables inside draw() - declare them at global scope"),
+            (r'(float|int)\s+\w+(?:\s*,\s*\w+)*\s*;', "All variables must be initialized when declared"),
+            (r'void\s+\w+\s*\([^\)]*\)\s*{', "Functions must be declared at global scope, not inside draw()")
+        ]
+        
+        for pattern, error in js_patterns:
+            if re.search(pattern, user_code):
+                errors.append(error)
+        
+        if errors:
+            # Return detailed error for retry prompt
+            error_msg = "\n• ".join(errors)
+            self.log.error(f"JavaScript syntax found:\n• {error_msg}")
+            return False  # Return False instead of raising error to trigger retry
+        
+        return True 

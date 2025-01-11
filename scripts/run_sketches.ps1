@@ -32,6 +32,29 @@ if ($renderVersion) {
     }
 }
 
+# Create render directory if it doesn't exist
+if (-not (Test-Path $RenderPath)) {
+    New-Item -ItemType Directory -Path $RenderPath | Out-Null
+}
+
+# Copy auto.pde to render directory
+$sketchCopy = Join-Path $RenderPath "sketch_v$renderVersion.pde"
+try {
+    if (-not (Test-Path $sketchPath)) {
+        Write-Error "Source sketch file not found: $sketchPath"
+        return $false
+    }
+    Copy-Item -Path $sketchPath -Destination $sketchCopy -Force
+    if (-not (Test-Path $sketchCopy)) {
+        Write-Error "Failed to copy sketch to: $sketchCopy"
+        return $false
+    }
+    Write-Host "Successfully copied sketch to: $sketchCopy"
+} catch {
+    Write-Error "Error copying sketch file: $_"
+    return $false
+}
+
 Write-Host "Starting with RenderPath: $RenderPath"
 Write-Host "Using sketch path: $sketchPath"
 
@@ -60,7 +83,7 @@ try {
     
     $processStartInfo = New-Object System.Diagnostics.ProcessStartInfo
     $processStartInfo.FileName = $processingPath
-    $processStartInfo.Arguments = "--sketch=$projectRoot --output=$RenderPath --force --run"
+    $processStartInfo.Arguments = "--sketch=$projectRoot --output=$RenderPath --force --no-java --run"
     $processStartInfo.UseShellExecute = $false
     $processStartInfo.RedirectStandardOutput = $true
     $processStartInfo.RedirectStandardError = $true
@@ -143,6 +166,10 @@ try {
     # Process video if frames exist
     $frames = Get-ChildItem -Path $RenderPath -Filter "frame-*.png"
     if ($frames.Count -ge 360) {
+        # Clean up compiled files
+        Remove-Item -Path "$RenderPath\source" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$RenderPath\*.class" -Force -ErrorAction SilentlyContinue
+        
         $outputFile = Join-Path $RenderPath "output.mp4"
         $version = $RenderPath -replace '.*_v(\d+)$','$1'
         $timestamp = [int64](Get-Date -UFormat %s) * 1000
@@ -172,7 +199,13 @@ try {
     if ($outputEvent) { Unregister-Event -SourceIdentifier $outputEvent.Name }
     if ($errorEvent) { Unregister-Event -SourceIdentifier $errorEvent.Name }
     
-    # Final cleanup
+    # Clean up compiled files
+    Write-Host "Cleaning up compiled files..."
+    Remove-Item -Path "$RenderPath\source" -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "$RenderPath\*.class" -Force -ErrorAction SilentlyContinue
+    # Note: We're no longer cleaning up the PDE file to preserve it as a snapshot
+    
+    # Final cleanup of processes
     Get-Process | Where-Object { $_.ProcessName -like "*processing-java*" -or $_.ProcessName -like "*java*" } | 
         ForEach-Object {
             try {

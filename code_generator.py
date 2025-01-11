@@ -316,21 +316,19 @@ Please fix these issues and return the corrected code."""
     
     # === File Operations ===
     def _save_code(self, code: str, version: int) -> None:
-        """Save generated code to auto.pde and copy to render directory"""
+        """Save generated code to auto.pde"""
         try:
             # Save to auto.pde
-            with open(self.config.paths['template'], 'w') as f:
+            template_path = self.config.paths['template']
+            with open(template_path, 'w') as f:
                 f.write(code)
             
-            # Create render directory if it doesn't exist
-            render_dir = self.config.base_path / "renders" / f"render_v{version}"
-            render_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Copy auto.pde to render directory as sketch_vX.pde
-            sketch_copy = render_dir / f"sketch_v{version}.pde"
-            shutil.copy2(self.config.paths['template'], sketch_copy)
-            
-            self.log.success(f"Saved code to {self.config.paths['template']} and copied to {sketch_copy}")
+            # Verify auto.pde was saved
+            if not template_path.exists():
+                self.log.error(f"Failed to save {template_path}")
+                return
+                
+            self.log.success(f"Saved code to {template_path}")
             
         except Exception as e:
             self.log.error(f"Failed to save code: {e}")
