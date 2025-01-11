@@ -40,54 +40,99 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
    - Load technique categories and parameters
 
 2. **Generation Pipeline:**
-   a. **Technique Selection:**
-      - Select 1-4 techniques based on historical performance
-      - Calculate synergy scores between techniques
-      - Apply weighted selection based on success rates
-      - Consider technique diversity and innovation potential
+   a. **Technique Selection (`pattern_evolution.py`):**
+      - Calculate technique weights based on:
+        * Historical performance (40% weight)
+        * Success rates (30% weight)
+        * Innovation factors (30% weight)
+      - Apply adaptation boosts:
+        * +20% for techniques with high adaptation rates
+        * +30% for techniques with proven synergy
+      - Select 1-4 techniques using weighted probabilities
+      - Consider technique combinations and synergy history
+      - Filter pool for synergistic choices if selecting multiple
+      - Update remaining pool based on synergy with all selected techniques
 
-   b. **Code Generation:**
-      - Select AI model (o1-mini or 4o) based on config weights
+   b. **Code Generation (`code_generator.py`):**
+      - Select AI model based on weighted randomization:
+        * o1: 33% probability
+        * o1-mini: 33% probability
+        * 4o: 34% probability
       - Generate Processing code using selected techniques
       - Validate code structure and requirements
       - Apply template with standardized setup
+      - Handle error recovery and retries
+      - Clean and merge code with proper validation
+      - Ensure proper error handling and logging
 
    c. **Rendering Process:**
       - Execute Processing sketch via PowerShell
       - Generate 360 frames at 60fps (6-second loop)
       - Save frames and metadata
       - Convert to MP4 using FFmpeg
+      - Verify render quality and completion
 
-   d. **Analysis Pipeline:**
-      - Load and sample frames (every 6th frame)
-      - Analyze complexity (edge density, pattern density)
-      - Calculate motion quality (flow, coverage, consistency)
-      - Evaluate aesthetic qualities (balance, composition)
-      - Measure visual coherence and technique synergy
+   d. **Analysis Pipeline (`pattern_analyzer.py`):**
+      - Frame Analysis: Every 6th frame is analyzed
+        * Complexity (edge density, pattern distribution)
+        * Motion quality (flow, coverage, consistency)
+        * Aesthetic qualities (balance, composition)
+        * Visual coherence
+        * Region complexity and element consistency
+      - Performance Metrics:
+        * Innovation score (comparison with history)
+        * Technique synergy measurement
+        * Adaptation rate calculation
+        * Evolution trend analysis
+      - Dynamic Weighting:
+        * Adjust metric weights based on pattern characteristics
+        * Consider technique count and complexity
+        * Balance between different quality aspects
 
-   e. **Evolution Tracking:**
-      - Update technique performance statistics
-      - Track pattern lineage and relationships
-      - Calculate adaptation rates and innovation factors
-      - Store synergy scores between techniques
+   e. **Evolution System:**
+      - Technique Evolution:
+        * Update success rates and performance stats
+        * Adjust adaptation rates based on stability
+        * Calculate new synergy scores
+        * Update technique weights
+        * Track performance trends
+      - Pattern Evolution:
+        * Track pattern lineage
+        * Store performance metrics
+        * Update technique relationships
+        * Calculate innovation factors
+        * Monitor visual coherence trends
+      - Database Updates:
+        * Save technique statistics
+        * Update synergy pairs
+        * Store evolution history
+        * Track adaptation rates
+        * Maintain performance trends
 
    f. **Documentation:**
       - Generate comprehensive pattern analysis
       - Track technique-specific insights
       - Monitor evolution trends
       - Store historical performance data
+      - Generate evolution insights
+      - Track technique observations
+      - Store pattern analysis with technical insights
 
    g. **Content Distribution:**
       - Sync videos to CDN
       - Update web components
       - Track version history
       - Manage render storage
+      - Handle video verification
+      - Monitor sync completion
 
 3. **Continuous Operation:**
    - Run iterations every 10 minutes
    - Monitor system performance
    - Track resource usage
    - Handle errors and recovery
+   - Maintain system stability
+   - Ensure consistent operation
 
 ## Core Features
 
