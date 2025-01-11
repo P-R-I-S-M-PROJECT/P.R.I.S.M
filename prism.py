@@ -11,6 +11,8 @@ from pattern_evolution import PatternEvolution
 from cleanup import SystemCleaner
 from datetime import datetime
 from models import Pattern
+import json
+from typing import Dict
 
 # Load environment variables
 load_dotenv()
@@ -46,14 +48,14 @@ Pattern Statistics:
 • High Scoring Patterns: {stats['high_scoring_patterns']}
 
 Performance Metrics:
-• Average Score: {stats['avg_score']}
-• Average Innovation: {stats['avg_innovation']}
-• Average Complexity: {stats['avg_complexity']}
+• Average Score: {stats['avg_score']:.2f}
+• Average Innovation: {stats['avg_innovation']:.2f}
+• Average Complexity: {stats['avg_complexity']:.2f}
 
-Top Performing Techniques:""")
+Top Technique Combinations:""")
         
-        for technique in stats['top_techniques']:
-            self.log.info(f"• {technique['name']}: {technique['avg_score']} ({technique['usage_count']} uses)")
+        for combo in stats['top_technique_combinations']:
+            self.log.info(f"• {combo['combination']}: {combo['synergy_score']:.2f} ({combo['usage_count']} uses)")
         
         self.log.separator()
     
@@ -222,8 +224,8 @@ Top Performing Techniques:""")
         self.log.title("O1 MODEL TEST MODE")
         try:
             while True:
-                # Force config to use o1-mini model
-                self.config.metadata['parameters']['generation']['ai_parameters']['model'] = 'o1-mini'
+                # Force config to use o1 model for testing
+                self.config.set_model_selection('o1')
                 
                 # Get creative direction
                 techniques = self.evolution.select_techniques()
@@ -265,10 +267,67 @@ Top Performing Techniques:""")
                 
                 # Ask to continue
                 if input("\nPress Enter to generate another, or 'q' to quit: ").lower() == 'q':
+                    # Reset model selection to random before exiting
+                    self.config.set_model_selection('random')
                     break
                 
         except KeyboardInterrupt:
+            # Reset model selection to random on interrupt
+            self.config.set_model_selection('random')
             self.log.warning("Test mode stopped by user")
+    
+    def _run_sketch(self, render_path: str, metadata: Dict = None) -> bool:
+        """Run the Processing sketch"""
+        try:
+            script_path = self.config.base_path / "scripts" / "run_sketches.ps1"
+            metadata_str = json.dumps(metadata) if metadata else "{}"
+            
+            # Run PowerShell script with parameters
+            cmd = [
+                "powershell.exe",
+                "-ExecutionPolicy", "Bypass",
+                "-File", str(script_path),
+                "-RenderPath", str(render_path),
+                "-Metadata", metadata_str
+            ]
+            
+            self.log.debug(f"Running command: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                self.log.error(f"Sketch execution failed: {result.stderr}")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            self.log.error(f"Error running sketch: {e}")
+            return False
+    
+    def _sync_videos(self):
+        """Sync videos to CDN"""
+        try:
+            self.log.info("Syncing video to server...")
+            result = subprocess.run(
+                ['node', 'web/scripts/sync-videos.ts'],
+                capture_output=True,
+                text=True
+            )
+            
+            # Only pass the relevant output to the logger
+            if result.returncode == 0:
+                # Extract just the CDN verification part
+                output_lines = result.stdout.split('\n')
+                cdn_info = '\n'.join(line for line in output_lines 
+                                   if 'CDN response' in line 
+                                   or 'verification successful' in line
+                                   or 'animation_v' in line)
+                self.log.video_sync_complete(cdn_info)
+            else:
+                self.log.error(f"Video sync failed: {result.stderr}")
+                
+        except Exception as e:
+            self.log.error(f"Error syncing videos: {e}")
 
 if __name__ == "__main__":
     config = Config()

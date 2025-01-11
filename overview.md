@@ -5,49 +5,104 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
 
 ## Project Structure
 
-1. **Core Components (`src/core/`):**
-   - `prism.py` - Main system orchestration
-   - `code_generator.py` - Pattern generation engine
-   - `pattern_analyzer.py` - Enhanced analysis and scoring system
-   - `pattern_evolution.py` - Advanced evolution and technique synergy
+1. **Core Components:**
+   - `prism.py` - Main system orchestration and continuous generation loop
+   - `code_generator.py` - Pattern generation engine with multi-model support
+   - `pattern_analyzer.py` - Frame-by-frame analysis and scoring system
+   - `pattern_evolution.py` - Technique selection and evolution tracking
+   - `logger.py` - Enhanced logging with visual feedback
+   - `config.py` - System configuration and parameter management
 
-2. **Database Management (`src/db/`):**
+2. **Database Management:**
    - `database_manager.py` - Evolution-aware SQLite operations
-   - `models.py` - Enhanced data models with evolution tracking
+   - `models/data_models.py` - Pattern and Technique data models
+   - `models/openai_o1.py` - O1 model integration
+   - `models/openai_4o.py` - 4O model integration
 
-3. **Documentation & Analysis (`src/docs/`):**
+3. **Documentation & Analysis:**
    - `documentation_manager.py` - Integrated analysis system
    - Pattern evolution insights
    - Technique performance tracking
    - Historical trend analysis
 
 4. **Support Directories:**
-   - `data/` - Enhanced database with evolution tracking
-   - `renders/` - Generated pattern outputs
-   - `scripts/` - Automation scripts
-   - `web/` - Web components
+   - `data/` - SQLite database and metadata
+   - `renders/` - Generated pattern outputs and frames
+   - `scripts/` - PowerShell automation scripts
+   - `web/` - Web components and CDN sync
+
+## Pipeline Overview
+
+1. **Initialization Phase:**
+   - Load environment variables and configuration
+   - Initialize SQLite database connection
+   - Set up logging system with visual feedback
+   - Load technique categories and parameters
+
+2. **Generation Pipeline:**
+   a. **Technique Selection:**
+      - Select 1-4 techniques based on historical performance
+      - Calculate synergy scores between techniques
+      - Apply weighted selection based on success rates
+      - Consider technique diversity and innovation potential
+
+   b. **Code Generation:**
+      - Select AI model (o1-mini or 4o) based on config weights
+      - Generate Processing code using selected techniques
+      - Validate code structure and requirements
+      - Apply template with standardized setup
+
+   c. **Rendering Process:**
+      - Execute Processing sketch via PowerShell
+      - Generate 360 frames at 60fps (6-second loop)
+      - Save frames and metadata
+      - Convert to MP4 using FFmpeg
+
+   d. **Analysis Pipeline:**
+      - Load and sample frames (every 6th frame)
+      - Analyze complexity (edge density, pattern density)
+      - Calculate motion quality (flow, coverage, consistency)
+      - Evaluate aesthetic qualities (balance, composition)
+      - Measure visual coherence and technique synergy
+
+   e. **Evolution Tracking:**
+      - Update technique performance statistics
+      - Track pattern lineage and relationships
+      - Calculate adaptation rates and innovation factors
+      - Store synergy scores between techniques
+
+   f. **Documentation:**
+      - Generate comprehensive pattern analysis
+      - Track technique-specific insights
+      - Monitor evolution trends
+      - Store historical performance data
+
+   g. **Content Distribution:**
+      - Sync videos to CDN
+      - Update web components
+      - Track version history
+      - Manage render storage
+
+3. **Continuous Operation:**
+   - Run iterations every 10 minutes
+   - Monitor system performance
+   - Track resource usage
+   - Handle errors and recovery
 
 ## Core Features
 
 1. **Pattern Generation:**
-   - AI-driven code generation
+   - AI-driven code generation with multiple models
    - Seamless 6-second loops (360 frames at 60fps)
    - Multiple interweaving cycles and rhythms
    - Dynamic pattern transformation
    - Balance between chaos and order
    - Emphasis on unique, non-repetitive generation
 
-2. **Creative Vision:**
-   - Visual symphony approach
-   - Temporal flow and rhythm
-   - Mathematical harmonies (golden ratio, fibonacci)
-   - Organic pattern emergence
-   - Multi-layered complexity
-   - Micro and macro detail integration
-
-3. **Enhanced Analysis Systems:**
+2. **Analysis Systems:**
    - Multi-dimensional pattern analysis:
-     * Technical implementation insights
+     * Frame-by-frame visual analysis
+     * Technical implementation scoring
      * Aesthetic quality evaluation
      * Evolution trend tracking
      * Technique synergy analysis
@@ -62,7 +117,7 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
      * Evolution trend analysis
      * System-wide learning
 
-4. **Advanced Evolution Strategy:**
+3. **Evolution Strategy:**
    - Dynamic technique selection with synergy awareness
    - Adaptive learning rates based on performance
    - Pattern lineage tracking and analysis
@@ -77,42 +132,46 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
      * Evolution chain analysis
      * Performance trend monitoring
 
-## Implementation Details
+## Technical Implementation
 
-1. **Generation Guidelines:**
-   - Visual music integration
-   - Temporal composition principles:
-     * Multiple rhythm layers
-     * Non-linear timing
-     * Anticipation and release
-     * Pattern transformation
-   - Spatial composition:
-     * Depth through layering
-     * Scale variation
-     * Negative space utilization
-     * Element interaction
+1. **Database Schema:**
+   - Patterns table:
+     * Version tracking
+     * Technique combinations
+     * Performance metrics
+     * Evolution history
+   - Technique stats table:
+     * Usage statistics
+     * Success rates
+     * Synergy scores
+     * Adaptation rates
+   - Evolution history table:
+     * Pattern lineage
+     * Performance trends
+     * Technique relationships
 
-2. **Enhanced Technical Framework:**
-   - Evolution-aware SQLite database:
-     * Pattern analysis storage
-     * Technique insights tracking
-     * Evolution trend monitoring
-     * Synergy score tracking
-   - Advanced caching system:
-     * Pattern lineage caching
-     * Technique performance caching
-     * Evolution trend caching
-   - Comprehensive documentation:
-     * Pattern-specific analysis
-     * Technique insights
-     * Evolution trends
-     * System learning
+2. **Analysis Metrics:**
+   - Complexity analysis:
+     * Edge detection and density
+     * Pattern distribution
+     * Region complexity
+     * Element consistency
+   - Motion analysis:
+     * Flow smoothness
+     * Coverage patterns
+     * Direction consistency
+     * Center-weighted movement
+   - Aesthetic evaluation:
+     * Compositional balance
+     * Negative space usage
+     * Layering and depth
+     * Contrast and form
 
 3. **Development Tools:**
    - PowerShell automation scripts
-   - Version control integration
-   - Environment configuration
-   - Render management
+   - FFmpeg video processing
+   - SQLite database management
+   - CDN integration
    - Cache control utilities
 
 ## Future Additions
@@ -120,39 +179,17 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
 1. **Multi-LLM System:**
    - Integration with multiple AI models
    - Self-hosted language model deployment
-   - Containerized model environments
    - Model performance comparison
-   - GPU acceleration support
-   - Resource monitoring and optimization
-   - Automated backup systems
-   - Custom model fine-tuning pipeline
+   - Resource optimization
 
-2. **Photo & Image Generation:**
-   - Image-based pattern generation
-   - Integration with image generation APIs
-   - Advanced prompt engineering system
-   - Pattern-to-image translation
-   - Style transfer and mixing
-   - Texture synthesis pipeline
-   - Visual pattern library
-   - Batch processing system
+2. **Enhanced Evolution System (v2):**
+   - Advanced technique synergy analysis
+   - Pattern DNA tracking and mixing
+   - Genetic algorithm integration
+   - Evolution visualization tools
 
 3. **Social Agent (v1):**
    - Automated content publishing
    - Platform-specific formatting
-   - Engagement monitoring
-   - Creation scheduling
-   - Hashtag optimization
    - Analytics dashboard
    - Content calendar management
-   - Cross-platform synchronization
-
-4. **Enhanced Evolution System (v2):**
-   - Advanced technique synergy analysis
-   - Pattern DNA tracking and mixing
-   - Genetic algorithm integration
-   - Multi-dimensional evolution scoring
-   - Advanced adaptation mechanisms
-   - Pattern family recognition
-   - Style inheritance tracking
-   - Evolution visualization tools

@@ -24,29 +24,52 @@ class OpenAI4OGenerator:
                         "content": """You are a Processing (Java-based) code generator.
                         CRITICAL: You must use Processing syntax (based on Java), NOT JavaScript/p5.js.
                         
+                        CRITICAL RULES FOR STATE/VARIABLES:
+                        1. Declare any persistent state variables at the GLOBAL scope (outside any function)
+                        2. NEVER use 'static' keyword inside draw()
+                        3. Initialize arrays and complex state in setup() if needed
+                        4. Use global variables for any state that persists between frames
+                        
                         CORRECT SYNTAX:
                         ```processing
+                        // Global state variables (outside any function)
                         int totalShapes = 50;
-                        float maxRadius = 300;
-                        float speed = 2 * PI;
+                        float[] angles;  // Declare arrays here
+                        float[] speeds;
                         
-                        for (int i = 0; i < totalShapes; i++) {
-                            float angle = TWO_PI * i / totalShapes + progress * speed;
-                            float radius = maxRadius * (1 + sin(progress * TWO_PI));
-                            float x = radius * cos(angle);
-                            float y = radius * sin(angle);
-                            
-                            stroke(255, 100, 100);
-                            ellipse(x, y, 10, 10);
+                        // Initialize in setup() if needed
+                        void setup() {
+                            angles = new float[totalShapes];
+                            speeds = new float[totalShapes];
+                            for (int i = 0; i < totalShapes; i++) {
+                                angles[i] = random(TWO_PI);
+                                speeds[i] = random(0.01, 0.05);
+                            }
+                        }
+                        
+                        // Use in draw()
+                        void draw() {
+                            for (int i = 0; i < totalShapes; i++) {
+                                angles[i] += speeds[i];
+                                float x = radius * cos(angles[i]);
+                                float y = radius * sin(angles[i]);
+                                ellipse(x, y, 10, 10);
+                            }
                         }
                         ```
                         
-                        INCORRECT (JavaScript) SYNTAX:
-                        ```javascript
-                        // DO NOT USE THIS STYLE:
-                        const totalShapes = 50;  // NO const
-                        let radius = 300;        // NO let
-                        for (let i = 0;...)      // NO let in loops
+                        INCORRECT PATTERNS TO AVOID:
+                        ```processing
+                        void draw() {
+                            // WRONG: Don't declare static variables here
+                            static float[] angles = new float[100];
+                            
+                            // WRONG: Don't initialize arrays in draw
+                            float[] newAngles = new float[100];
+                            
+                            // WRONG: Don't use static keyword in draw
+                            static boolean initialized = false;
+                        }
                         ```
                         
                         Return ONLY Processing-compatible code between the markers."""
@@ -86,10 +109,13 @@ Choose your approach thoughtfully - not every piece needs to use every technique
 
 === CRITICAL SYNTAX RULES ===
 • REQUIRED: Use Processing (Java) syntax, NOT JavaScript
-• Variables MUST be declared as:
-    float radius = 200;
-    int count = 10;
-    float[] angles;  // Arrays
+• Use ASCII characters only in code and comments (no °, ©, etc.)
+• Variables MUST be declared AND initialized in the same line:
+    float radius = 200;  // CORRECT
+    int count = 10;      // CORRECT
+    float x, y;          // WRONG - must initialize
+    float x = 0, y = 0;  // CORRECT
+    float[] angles = new float[100];  // Arrays must be initialized
 • NO JavaScript keywords (const, let, var)
 • NO JavaScript functions (push, pop, createVector)
 • Color must use RGB values:
@@ -214,7 +240,9 @@ Use stroke() or fill() with color values, and ensure your shapes have size."""
             (r'color\(([\'"]#[0-9a-fA-F]+[\'"]\))', "Use RGB values instead of hex codes: color(255, 0, 0)"),
             (r'\b(push|pop)\s*\(\s*\)', "Use pushMatrix()/popMatrix() instead of push()/pop()"),
             (r'createVector\s*\(', "Use 'new PVector()' instead of createVector()"),
-            (r'function\s+\w+\s*\(', "Functions must be declared outside creative code block")
+            (r'function\s+\w+\s*\(', "Functions must be declared outside creative code block"),
+            (r'\bstatic\s+\w+', "Do not use static variables inside draw() - declare them at global scope"),
+            (r'(float|int)\s+\w+(?:\s*,\s*\w+)*\s*;', "All variables must be initialized when declared")
         ]
         
         for pattern, error in js_patterns:

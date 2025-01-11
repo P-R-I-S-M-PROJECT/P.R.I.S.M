@@ -25,6 +25,7 @@ class ProcessingGenerator:
         self._current_innovation = 0.5  # Default values
         # Initialize AI generators
         self.ai_generators = {
+            'o1': OpenAIO1Generator(config, self.log),
             'o1-mini': OpenAIO1Generator(config, self.log),
             '4o': OpenAI4OGenerator(config, self.log)
         }
@@ -42,8 +43,17 @@ class ProcessingGenerator:
             self._current_model = self._select_model()
             self.log.info(f"Using model: {self._current_model}")
             
-            # Generate code and run sketch
-            next_version = version if version > 0 else 1  # Start at 1 after cleanup
+            # Store selected model in metadata
+            if 'generation' not in self.config.metadata['parameters']:
+                self.config.metadata['parameters']['generation'] = {}
+            if 'ai_parameters' not in self.config.metadata['parameters']['generation']:
+                self.config.metadata['parameters']['generation']['ai_parameters'] = {}
+            
+            self.config.metadata['parameters']['generation']['ai_parameters']['last_used_model'] = self._current_model
+            self.config.save_metadata()
+            
+            # Get next version from config (which scans renders directory)
+            next_version = self.config.get_next_version()
             code = self._attempt_code_generation(technique_names, next_version)
             if code:
                 # Save and test the code
@@ -83,7 +93,21 @@ class ProcessingGenerator:
         """Public scoring interface"""
         try:
             render_path = self.config.base_path / "renders" / f"render_v{pattern.version}"
-            return self.analyzer.analyze_pattern(pattern, render_path)
+            scores = self.analyzer.analyze_pattern(pattern, render_path)
+            
+            # Update model statistics in metadata
+            ai_params = self.config.metadata['parameters']['generation']['ai_parameters']
+            if self._current_model and self._current_model in ai_params['generation_stats']:
+                stats = ai_params['generation_stats'][self._current_model]
+                stats['uses'] += 1
+                # Update running average
+                stats['avg_score'] = (
+                    (stats['avg_score'] * (stats['uses'] - 1) + scores['overall']) 
+                    / stats['uses']
+                )
+                self.config.save_metadata()
+            
+            return scores
             
         except Exception as e:
             self.log.error(f"Error scoring pattern: {e}")
@@ -100,25 +124,38 @@ class ProcessingGenerator:
         """Attempt to generate valid code with retries"""
         last_code = None
         last_error = None
+        original_prompt = prompt
         
         for attempt in range(max_attempts):
             try:
+                self.log.debug(f"\n=== GENERATION ATTEMPT {attempt + 1} ===")
+                if last_error:
+                    self.log.debug(f"Previous error: {last_error}")
+                    
                 generator = self.ai_generators[self._current_model]
                 if generated_code := self._try_single_generation(generator, prompt, attempt, version):
                     return generated_code
+                    
             except ValueError as e:
                 last_error = str(e)
                 self.log.error(f"Generation attempt {attempt + 1} failed: {e}")
+                
                 # Build error prompt with last code and error
                 if "Model returned no code" in str(e):
                     # If no code was returned, try a simpler prompt
-                    prompt = self._build_simpler_prompt(prompt)
+                    prompt = self._build_simpler_prompt(original_prompt)
+                    self.log.debug(f"\n=== SIMPLIFIED PROMPT ===\n{prompt}\n==================\n")
                 else:
                     # Otherwise use the error prompt with the last code
                     prompt = self._build_error_prompt(last_code, last_error)
+                    self.log.debug(f"\n=== ERROR PROMPT ===\n{prompt}\n==================\n")
+                    
             except Exception as e:
+                last_error = str(e)
                 self.log.error(f"Unexpected error in attempt {attempt + 1}: {e}")
                 prompt = self._build_error_prompt(last_code, str(e))
+                self.log.debug(f"\n=== ERROR PROMPT ===\n{prompt}\n==================\n")
+                
             finally:
                 if 'generated_code' in locals():
                     last_code = generated_code
@@ -184,6 +221,10 @@ class ProcessingGenerator:
             code = re.sub(r'\n```.*?$', '', code)
             code = code.strip()
             
+            # Clean special characters and ensure ASCII compatibility
+            code = code.encode('ascii', 'ignore').decode()  # Remove non-ASCII chars
+            code = re.sub(r'[^\x00-\x7F]+', '', code)  # Additional non-ASCII cleanup
+            
             # Debug log the cleaned code
             self.log.debug(f"\nCleaned code before template insertion:\n{code}\n")
             
@@ -224,19 +265,24 @@ class ProcessingGenerator:
     # === Prompt Building ===
     def _build_error_prompt(self, code: str, error_msg: str = None) -> str:
         """Build error prompt for retry attempts"""
-        error_context = f"""Previous code had syntax issues:
-{error_msg if error_msg else 'Unknown error'}
+        specific_guidance = self._get_error_guidance(error_msg)
+        
+        error_context = f"""Previous attempt had issues that need to be fixed:
+ERROR: {error_msg if error_msg else 'Unknown error'}
 
-Fix the code using proper Processing syntax:
-- Use float/int for variables
-- Use proper for loop syntax: for (int i = 0; ...)
-- Use RGB colors: color(255, 0, 0)
-- Use Processing matrix commands: pushMatrix()/popMatrix()
+GUIDANCE:
+{specific_guidance}
 
 Previous code for reference:
-{code}
+{code if code else '(No code was generated)'}
 
-Return corrected code between the markers."""
+REQUIREMENTS:
+1. Return ONLY the creative code between the markers
+2. DO NOT include setup(), draw(), or other framework code
+3. Use only the provided progress variable (0.0 to 1.0) for animation
+4. Keep code focused and efficient
+
+Please fix these issues and return the corrected code."""
         
         return error_context
     
@@ -244,6 +290,12 @@ Return corrected code between the markers."""
         """Get specific guidance based on error type"""
         if not error_msg:
             return "• Try a simpler approach with cleaner code structure"
+        
+        if "Contains translate()" in error_msg:
+            return """• DO NOT use translate() - all positioning should be relative to canvas center (0,0)
+• Use direct x,y coordinates: x = width/2 + offset
+• For rotations, use rotate() with pushMatrix/popMatrix
+• Remember the canvas is already centered"""
         
         if "Creative validation" in error_msg:
             return """• Remove any setup/draw function declarations
@@ -328,7 +380,7 @@ Return corrected code between the markers."""
     def run_sketch(self, render_path: Path) -> tuple[bool, str]:
         """Run Processing sketch and generate frames"""
         try:
-            script_path = self.config.base_path / "run_sketches.ps1"
+            script_path = self.config.base_path / "scripts" / "run_sketches.ps1"
             
             # Create metadata object with model info
             metadata = {
@@ -400,11 +452,11 @@ Return corrected code between the markers."""
     
     def _select_model(self) -> str:
         """Select a model based on config weights"""
-        ai_params = self.config.metadata['parameters']['generation']['ai_parameters']
-        if ai_params['model'] != 'random':
-            return ai_params['model']
+        model_config = self.config.get_model_config()
+        if model_config['model_selection'] != 'random':
+            return model_config['model_selection']
         
-        weights = ai_params['model_weights']
+        weights = model_config['model_weights']
         models = list(weights.keys())
         probabilities = list(weights.values())
         return random.choices(models, weights=probabilities, k=1)[0]
@@ -417,3 +469,25 @@ Focus on creating something minimal but effective.
 Original techniques to consider: {original_prompt}
 
 Return the code between the markers."""
+    
+    def _get_next_version(self) -> int:
+        """Determine next version number by scanning renders directory"""
+        try:
+            renders_path = self.config.base_path / "renders"
+            if not renders_path.exists():
+                return 1
+                
+            # Find all render_v* directories and extract version numbers
+            versions = []
+            for dir_path in renders_path.glob("render_v*"):
+                try:
+                    version_str = dir_path.name.replace("render_v", "")
+                    version = int(version_str)
+                    versions.append(version)
+                except ValueError:
+                    continue
+                    
+            return max(versions, default=0) + 1
+        except Exception as e:
+            self.log.error(f"Error determining next version: {e}")
+            return 1

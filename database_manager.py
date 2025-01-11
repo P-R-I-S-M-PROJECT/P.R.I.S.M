@@ -17,18 +17,23 @@ class DatabaseManager:
         self._cache_lock = threading.Lock()
         self.init_db()
     
+    def get_connection(self) -> sqlite3.Connection:
+        """Get a new database connection"""
+        return sqlite3.connect(self.db_path)
+    
     def init_db(self, force: bool = False):
         """Initialize database with required tables"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
             if force:
                 cursor.execute("DROP TABLE IF EXISTS patterns")
                 cursor.execute("DROP TABLE IF EXISTS technique_stats")
                 cursor.execute("DROP TABLE IF EXISTS evolution_history")
                 cursor.execute("DROP TABLE IF EXISTS technique_synergy")
             
-            # Enhanced patterns table with new metrics
+            # Create patterns table if it doesn't exist
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS patterns (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +53,7 @@ class DatabaseManager:
                 )
             """)
             
-            # Enhanced technique_stats table
+            # Create technique_stats if it doesn't exist
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS technique_stats (
                     technique TEXT PRIMARY KEY,
@@ -64,7 +69,12 @@ class DatabaseManager:
                 )
             """)
             
-            # New table for evolution history
+            # Initialize technique categories if table is empty
+            cursor.execute("SELECT COUNT(*) FROM technique_stats")
+            if cursor.fetchone()[0] == 0:
+                self._init_technique_categories(cursor)
+            
+            # Create evolution history table if it doesn't exist
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS evolution_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,7 +88,7 @@ class DatabaseManager:
                 )
             """)
             
-            # New table for technique synergy
+            # Create technique synergy table if it doesn't exist
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS technique_synergy (
                     technique1 TEXT NOT NULL,
@@ -99,16 +109,33 @@ class DatabaseManager:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_evolution_timestamp ON evolution_history(timestamp)")
             
             conn.commit()
+        finally:
+            conn.close()
+    
+    def _init_technique_categories(self, cursor):
+        """Initialize technique categories from config"""
+        categories = self.config.technique_categories
+        timestamp = datetime.now().isoformat()
+        
+        for category, techniques in categories.items():
+            for technique in techniques:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO technique_stats (
+                        technique, category, last_used
+                    ) VALUES (?, ?, ?)
+                """, (technique, category, timestamp))
     
     @lru_cache(maxsize=32)
     def get_pattern(self, pattern_id: int) -> Optional[Pattern]:
         """Get pattern by ID with caching"""
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self.get_connection()
+        try:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT version, code, timestamp, techniques, score,
                        innovation_score, aesthetic_score, mathematical_complexity,
-                       motion_quality
+                       motion_quality, visual_coherence, technique_synergy,
+                       parent_patterns
                 FROM patterns 
                 WHERE id = ?
             """, (pattern_id,))
@@ -126,17 +153,24 @@ class DatabaseManager:
                 innovation_score=row[5],
                 aesthetic_score=row[6],
                 mathematical_complexity=row[7],
-                motion_quality=row[8]
+                motion_quality=row[8],
+                visual_coherence=row[9],
+                technique_synergy=row[10],
+                parent_patterns=json.loads(row[11]) if row[11] else []
             )
+        finally:
+            conn.close()
     
     def get_recent_patterns(self, limit: int = 3) -> List[Pattern]:
         """Get most recent patterns"""
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self.get_connection()
+        try:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT version, code, timestamp, techniques, score,
                        innovation_score, aesthetic_score, mathematical_complexity,
-                       motion_quality
+                       motion_quality, visual_coherence, technique_synergy,
+                       parent_patterns
                 FROM patterns 
                 ORDER BY timestamp DESC 
                 LIMIT ?
@@ -151,8 +185,13 @@ class DatabaseManager:
                 innovation_score=row[5],
                 aesthetic_score=row[6],
                 mathematical_complexity=row[7],
-                motion_quality=row[8]
+                motion_quality=row[8],
+                visual_coherence=row[9],
+                technique_synergy=row[10],
+                parent_patterns=json.loads(row[11]) if row[11] else []
             ) for row in cursor.fetchall()]
+        finally:
+            conn.close()
     
     def get_successful_patterns(self, min_score: float = 75.0, limit: int = 5) -> List[Pattern]:
         """Get patterns with score above threshold"""
@@ -161,7 +200,8 @@ class DatabaseManager:
             cursor.execute("""
                 SELECT version, code, timestamp, techniques, score,
                        innovation_score, aesthetic_score, mathematical_complexity,
-                       motion_quality
+                       motion_quality, visual_coherence, technique_synergy,
+                       parent_patterns
                 FROM patterns 
                 WHERE score >= ?
                 ORDER BY score DESC 
@@ -177,12 +217,16 @@ class DatabaseManager:
                 innovation_score=row[5],
                 aesthetic_score=row[6],
                 mathematical_complexity=row[7],
-                motion_quality=row[8]
+                motion_quality=row[8],
+                visual_coherence=row[9],
+                technique_synergy=row[10],
+                parent_patterns=json.loads(row[11]) if row[11] else []
             ) for row in cursor.fetchall()]
     
     def get_technique_stats(self) -> Dict[str, Dict[str, Any]]:
         """Get enhanced performance statistics for all techniques"""
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self.get_connection()
+        try:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT t.technique, t.category, t.avg_score, t.usage_count,
@@ -220,10 +264,13 @@ class DatabaseManager:
                 }
             
             return stats
+        finally:
+            conn.close()
     
     def save_pattern(self, pattern: Pattern) -> int:
         """Save pattern with evolution tracking"""
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self.get_connection()
+        try:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO patterns (
@@ -246,7 +293,10 @@ class DatabaseManager:
                 pattern.technique_synergy,
                 json.dumps(pattern.parent_patterns)
             ))
+            conn.commit()
             return cursor.lastrowid
+        finally:
+            conn.close()
     
     def save_technique(self, technique: Technique) -> None:
         """Save technique with evolution history"""
@@ -376,20 +426,20 @@ class DatabaseManager:
     
     def get_system_stats(self) -> Dict[str, Any]:
         """Get enhanced system-wide statistics"""
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self.get_connection()
+        try:
             cursor = conn.cursor()
             
-            # Get pattern stats with new metrics
+            # Get pattern stats with existing metrics
             cursor.execute("""
                 SELECT 
                     COUNT(*) as total,
-                    MAX(version) as latest,
+                    COALESCE(MAX(version), 0) as latest,
                     SUM(CASE WHEN score > 75 THEN 1 ELSE 0 END) as high_scoring,
-                    AVG(score) as avg_score,
-                    AVG(innovation_score) as avg_innovation,
-                    AVG(mathematical_complexity) as avg_complexity,
-                    AVG(visual_coherence) as avg_coherence,
-                    AVG(technique_synergy) as avg_synergy
+                    COALESCE(AVG(score), 0) as avg_score,
+                    COALESCE(AVG(innovation_score), 0) as avg_innovation,
+                    COALESCE(AVG(mathematical_complexity), 0) as avg_complexity,
+                    COALESCE(AVG(motion_quality), 0) as avg_motion
                 FROM patterns
             """)
             pattern_stats = cursor.fetchone()
@@ -415,14 +465,85 @@ class DatabaseManager:
                 'usage_count': row[2]
             } for row in cursor.fetchall()]
             
+            # Ensure we have valid values even with empty database
             return {
-                'total_patterns': pattern_stats[0],
-                'latest_version': pattern_stats[1],
-                'high_scoring_patterns': pattern_stats[2],
-                'avg_score': pattern_stats[3],
-                'avg_innovation': pattern_stats[4],
-                'avg_complexity': pattern_stats[5],
-                'avg_coherence': pattern_stats[6],
-                'avg_synergy': pattern_stats[7],
-                'top_technique_combinations': top_combos
+                'total_patterns': pattern_stats[0] or 0,
+                'latest_version': pattern_stats[1] or 0,
+                'high_scoring_patterns': pattern_stats[2] or 0,
+                'avg_score': pattern_stats[3] or 0.0,
+                'avg_innovation': pattern_stats[4] or 0.0,
+                'avg_complexity': pattern_stats[5] or 0.0,
+                'avg_motion': pattern_stats[6] or 0.0,
+                'top_technique_combinations': top_combos or []
             }
+        finally:
+            conn.close()
+    
+    def update_synergy_pair(self, technique1: str, technique2: str, synergy_score: float) -> None:
+        """Update or create synergy score between two techniques"""
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # Ensure consistent ordering of technique pairs
+            if technique1 > technique2:
+                technique1, technique2 = technique2, technique1
+            
+            cursor.execute("""
+                INSERT OR REPLACE INTO technique_synergy (
+                    technique1, technique2, synergy_score, last_updated, usage_count
+                ) VALUES (
+                    ?, ?, ?, ?, 
+                    COALESCE((SELECT usage_count + 1 FROM technique_synergy 
+                             WHERE technique1 = ? AND technique2 = ?), 1)
+                )
+            """, (
+                technique1, technique2, synergy_score, 
+                datetime.now().isoformat(),
+                technique1, technique2
+            ))
+            
+            conn.commit()
+        finally:
+            conn.close()
+    
+    def get_historical_techniques(self, limit: int = 10) -> List[List[str]]:
+        """Get techniques used in recent patterns"""
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT techniques
+                FROM patterns
+                WHERE techniques IS NOT NULL
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """, (limit,))
+            
+            return [json.loads(row[0]) if row[0] else [] 
+                   for row in cursor.fetchall()]
+        finally:
+            conn.close()
+    
+    def ensure_version_exists(self, version: int) -> None:
+        """Ensure a version exists in the database, creating placeholder if needed"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Check if version exists
+            cursor.execute("SELECT COUNT(*) FROM patterns WHERE version = ?", (version,))
+            exists = cursor.fetchone()[0] > 0
+            
+            # Create placeholder if it doesn't exist
+            if not exists:
+                cursor.execute("""
+                    INSERT INTO patterns (
+                        version, code, timestamp, techniques, score,
+                        innovation_score, aesthetic_score, mathematical_complexity,
+                        motion_quality, visual_coherence, technique_synergy
+                    ) VALUES (
+                        ?, 'PLACEHOLDER', datetime('now'), '[]',
+                        75.0, 75.0, 75.0, 75.0, 75.0, 75.0, 75.0
+                    )
+                """, (version,))
+                conn.commit()

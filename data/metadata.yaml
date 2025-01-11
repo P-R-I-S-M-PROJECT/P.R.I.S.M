@@ -1,5 +1,5 @@
-current_version: 2184
-last_updated: '2024-12-21T05:56:41.389488'
+current_version: 2255
+last_updated: '2025-01-10T18:32:21.959714'
 parameters:
   analysis:
     aesthetic:
@@ -93,14 +93,17 @@ parameters:
       - resonance_patterns
   generation:
     ai_parameters:
-      available_models:
-      - o1-mini
-      - 4o
-      default_model: o1-mini
-      model: o1-mini
-      model_weights:
-        4o: 0.5
-        o1-mini: 0.5
+      generation_stats:
+        4o:
+          avg_score: 58.549569142422584
+          uses: 5
+        o1:
+          avg_score: 61.18991910423227
+          uses: 7
+        o1-mini:
+          avg_score: 58.485539027525185
+          uses: 6
+      last_used_model: o1-mini
     constraints:
       max_elements: 1000
       min_frame_time: 16

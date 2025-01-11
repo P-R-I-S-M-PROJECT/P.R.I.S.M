@@ -42,18 +42,14 @@ class PatternAnalyzer:
             
             # Calculate core metrics with more diverse weighting
             try:
-                complexity = self._calculate_complexity(frames) * 100
+                complexity = self._calculate_complexity(frames)
                 self.log.debug(f"Raw complexity score: {complexity:.2f}")
-                # Add variation to complexity based on pattern type
-                if 'flow_fields' in pattern.techniques:
-                    complexity *= 1.2
-                elif 'voronoi_diagrams' in pattern.techniques:
-                    complexity *= 1.15
-                self.log.debug(f"Adjusted complexity score: {complexity:.2f}")
+                # Removed hardcoded technique-specific boosts to maintain creative freedom
+                self.log.debug(f"Final complexity score: {complexity:.2f}")
             except Exception as e:
                 self.log.error(f"Complexity calculation failed: {e}")
-                complexity = 60.0 + np.random.normal(0, 5)  # Add some randomness
-
+                complexity = 60.0 + np.random.normal(0, 5)
+            
             try:
                 innovation = self._calculate_innovation(frames, pattern)
                 # Boost innovation for certain technique combinations
@@ -63,7 +59,7 @@ class PatternAnalyzer:
             except Exception as e:
                 self.log.error(f"Innovation calculation failed: {e}")
                 innovation = 70.0 + np.random.normal(0, 10)
-
+            
             try:
                 aesthetic = self._calculate_aesthetic_score(frames) * 100
                 # Adjust aesthetic based on frame analysis
@@ -73,15 +69,29 @@ class PatternAnalyzer:
             except Exception as e:
                 self.log.error(f"Aesthetic calculation failed: {e}")
                 aesthetic = 65.0 + np.random.normal(0, 7)
-
-            # Calculate motion score
+            
             try:
                 motion = self._calculate_motion_quality(frames) * 100
                 self.log.debug(f"Motion score: {motion:.2f}")
             except Exception as e:
                 self.log.error(f"Motion calculation failed: {e}")
                 motion = 60.0 + np.random.normal(0, 8)
-
+            
+            # Calculate new metrics
+            try:
+                coherence = self._calculate_visual_coherence(frames) * 100
+                self.log.debug(f"Coherence score: {coherence:.2f}")
+            except Exception as e:
+                self.log.error(f"Coherence calculation failed: {e}")
+                coherence = 70.0 + np.random.normal(0, 5)
+            
+            try:
+                synergy = self._calculate_technique_synergy(pattern) * 100
+                self.log.debug(f"Synergy score: {synergy:.2f}")
+            except Exception as e:
+                self.log.error(f"Synergy calculation failed: {e}")
+                synergy = 75.0 + np.random.normal(0, 5)
+            
             # Dynamic weighting based on pattern characteristics
             weights = self._calculate_dynamic_weights(pattern, complexity, innovation, aesthetic, motion)
             
@@ -93,15 +103,21 @@ class PatternAnalyzer:
                 motion * weights['motion']
             )
             
+            # Adjust overall score based on coherence and synergy
+            overall_score *= (1.0 + (coherence - 75) / 200)  # Small boost/penalty based on coherence
+            overall_score *= (1.0 + (synergy - 75) / 200)    # Small boost/penalty based on synergy
+            
             # Ensure score stays within bounds
-            overall_score = max(10.0, min(100.0, overall_score))
+            overall_score = float(max(10.0, min(100.0, overall_score)))
             
             return {
-                'overall': overall_score,
-                'complexity': complexity,
-                'innovation': innovation,
-                'aesthetic': aesthetic,
-                'motion': motion
+                'overall': float(overall_score),
+                'complexity': float(complexity),
+                'innovation': float(innovation),
+                'aesthetic': float(aesthetic),
+                'motion': float(motion),
+                'coherence': float(coherence),
+                'synergy': float(synergy)
             }
             
         except Exception as e:
@@ -194,7 +210,8 @@ class PatternAnalyzer:
                     intensity_std = np.std(frame) / 128.0
                     
                     # Region complexity - Check distinct regions
-                    _, regions = cv2.connectedComponents(frame > 30)
+                    binary_mask = (frame > 30).astype(np.uint8) * 255  # Convert to proper format
+                    _, regions = cv2.connectedComponents(binary_mask)
                     region_complexity = min(1.0, (regions.max() / 100))  # Normalize to max 100 regions
                     
                     # Combine metrics with adjusted weights
@@ -238,8 +255,8 @@ class PatternAnalyzer:
             # Add technique bonus
             technique_bonus = self._calculate_technique_bonus(pattern.techniques)
             
-            # Add visual bonus
-            visual_bonus = self._calculate_visual_bonus(frames, historical_patterns)
+            # Add visual bonus - only if we have historical frames to compare against
+            visual_bonus = self._calculate_visual_bonus(frames, historical_patterns) if historical_patterns else 10.0
             
             return min(100.0, base_score + technique_bonus + visual_bonus)
             
@@ -413,10 +430,16 @@ class PatternAnalyzer:
             for pattern in patterns:
                 # Updated to use consistent render path structure
                 render_path = self.config.base_path / "renders" / f"render_v{pattern.version}"
-                if render_path.exists():
-                    frames = self._load_frames(render_path)
-                    if frames:
-                        historical_frames.append(frames)
+                # Skip if directory doesn't exist or has no frame files
+                if not render_path.exists() or not any(render_path.glob("frame-*.png")):
+                    continue
+                    
+                frames = self._load_frames(render_path)
+                if frames:
+                    historical_frames.append(frames)
+            
+            if not historical_frames:
+                self.log.debug("No historical frames found for comparison")
             
             return historical_frames
             
@@ -471,12 +494,82 @@ class PatternAnalyzer:
         total = sum(weights.values())
         return {k: v/total for k, v in weights.items()}
     
+    def _calculate_visual_coherence(self, frames: List[np.ndarray]) -> float:
+        """Calculate visual coherence of the pattern"""
+        try:
+            if not frames:
+                return 0.75
+            
+            coherence_scores = []
+            for frame in frames:
+                # Calculate spatial distribution with more tolerance
+                spatial_dist = cv2.normalize(frame, None, 0, 1, cv2.NORM_MINMAX)
+                spatial_score = np.clip(1 - np.std(spatial_dist) * 2, 0, 1)  # More forgiving scaling
+                
+                # Calculate element consistency with improved robustness
+                edges = cv2.Canny(frame, 50, 150)  # Increased lower threshold
+                contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+                
+                if contours:
+                    areas = [cv2.contourArea(c) for c in contours]
+                    mean_area = np.mean(areas)
+                    if mean_area > 0:
+                        # More forgiving size consistency calculation
+                        size_consistency = np.clip(1 - (np.std(areas) / mean_area) * 0.5, 0.3, 1.0)
+                    else:
+                        size_consistency = 0.5
+                else:
+                    size_consistency = 0.5
+                
+                # Calculate overall frame coherence with adjusted weights
+                frame_coherence = (spatial_score * 0.5 + size_consistency * 0.5)
+                coherence_scores.append(frame_coherence)
+            
+            # Take the mean and ensure it's positive
+            return max(0.3, np.mean(coherence_scores))
+            
+        except Exception as e:
+            self.log.error(f"Error calculating visual coherence: {e}")
+            return 0.75
+            
+    def _calculate_technique_synergy(self, pattern: Pattern) -> float:
+        """Calculate how well techniques work together"""
+        try:
+            if len(pattern.techniques) < 2:
+                return 0.75
+            
+            # Get historical synergy data
+            synergy_pairs = self.db.get_synergy_pairs(min_score=70.0)
+            
+            # Create a synergy matrix
+            technique_pairs = []
+            for i, t1 in enumerate(pattern.techniques):
+                for t2 in pattern.techniques[i+1:]:
+                    pair = (t1, t2)
+                    # Look for historical synergy
+                    synergy = next((s[2] for s in synergy_pairs 
+                                  if (s[0] == t1 and s[1] == t2) or 
+                                     (s[0] == t2 and s[1] == t1)), 75.0)
+                    technique_pairs.append(synergy / 100.0)
+            
+            if not technique_pairs:
+                return 0.75
+                
+            # Calculate overall synergy
+            return np.mean(technique_pairs)
+            
+        except Exception as e:
+            self.log.error(f"Error calculating technique synergy: {e}")
+            return 0.75
+            
     def _get_default_scores(self) -> Dict[str, float]:
         """Return randomized default scores"""
         return {
-            'overall': 65.0 + np.random.normal(0, 5),
-            'complexity': 60.0 + np.random.normal(0, 7),
-            'innovation': 70.0 + np.random.normal(0, 10),
-            'aesthetic': 65.0 + np.random.normal(0, 5),
-            'motion': 60.0 + np.random.normal(0, 8)
+            'overall': float(65.0 + np.random.normal(0, 5)),
+            'complexity': float(60.0 + np.random.normal(0, 7)),
+            'innovation': float(70.0 + np.random.normal(0, 10)),
+            'aesthetic': float(65.0 + np.random.normal(0, 5)),
+            'motion': float(60.0 + np.random.normal(0, 8)),
+            'coherence': float(70.0 + np.random.normal(0, 5)),
+            'synergy': float(75.0 + np.random.normal(0, 5))
         }

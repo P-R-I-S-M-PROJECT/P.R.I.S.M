@@ -24,7 +24,7 @@ class Pattern:
     def get_metrics(self) -> Dict[str, float]:
         """Get all pattern metrics including new evolution metrics"""
         return {
-            'score': self.score,
+            'overall': self.score,  # Changed from 'score' to 'overall' to match analyzer output
             'innovation': self.innovation_score,
             'aesthetic': self.aesthetic_score,
             'complexity': self.mathematical_complexity,
@@ -47,7 +47,7 @@ class Pattern:
         """Track pattern evolution history"""
         if parent_version not in self.parent_patterns:
             self.parent_patterns.append(parent_version)
-        self.evolution_chain = self.parent_patterns + [self.version]
+        self.evolution_chain = sorted(self.parent_patterns + [self.version])
 
 @dataclass
 class Technique:

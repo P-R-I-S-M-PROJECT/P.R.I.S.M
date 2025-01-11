@@ -10,17 +10,23 @@ class OpenAIO1Generator:
         self.config = config
         self.log = logger or ArtLogger()
         self.client = OpenAI(api_key=config.api_key)
-        # Define available models and their weights
-        self.o1_models = {
-            'o1-mini': 0.99,
-            'o1': 0.01  
+        # Track current model
+        self.current_model = None
+        # Model ID mapping
+        self.model_ids = {
+            'o1': 'o1',  # Correct model ID
+            'o1-mini': 'o1-mini'  # Correct model ID
         }
     
-    def _select_o1_model(self) -> str:
-        """Randomly select between o1-mini and o1 models"""
-        models = list(self.o1_models.keys())
-        weights = list(self.o1_models.values())
-        return random.choices(models, weights=weights, k=1)[0]
+    def _select_o1_model(self, model: str = None) -> str:
+        """Get the appropriate O1 model to use"""
+        if model in ['o1', 'o1-mini']:
+            self.current_model = model
+            return self.model_ids[model]
+            
+        # Default to o1 if not specified
+        self.current_model = 'o1'
+        return self.model_ids['o1']
     
     def generate_with_ai(self, prompt: str) -> Optional[str]:
         """Generate code using OpenAI API with better error handling"""
@@ -35,9 +41,12 @@ Just remember to use Processing's Java-style syntax as your medium."""
             
             full_prompt = context + "\n\n" + structured_prompt
             
-            # Select which O1 model to use
-            selected_model = self._select_o1_model()
-            self.log.info(f"Using model: {selected_model}")
+            # Log the full prompt being sent
+            self.log.debug(f"\n=== SENDING TO AI ===\n{full_prompt}\n==================\n")
+            
+            # Use the model that was selected
+            selected_model = self._select_o1_model(self.current_model)
+            self.log.debug(f"Using model ID: {selected_model} (from {self.current_model})")
             
             response = self.client.chat.completions.create(
                 model=selected_model,
@@ -49,15 +58,26 @@ Just remember to use Processing's Java-style syntax as your medium."""
             if not response.choices:
                 self.log.error("No response generated from AI")
                 return None
+                
+            # Log the raw response
+            raw_content = response.choices[0].message.content
+            self.log.debug(f"\n=== AI RESPONSE ===\n{raw_content}\n==================\n")
             
-            code = self._extract_code_from_response(response.choices[0].message.content)
-            if code:
-                # Convert any remaining JavaScript syntax to Processing
-                code = self._convert_to_processing(code)
+            code = self._extract_code_from_response(raw_content)
+            if not code:
+                self.log.debug("Failed to extract code from response")
+                return raw_content.strip()  # Return the raw content if no markers found
+                
+            # Log the extracted code
+            self.log.debug(f"\n=== EXTRACTED CODE ===\n{code}\n==================\n")
+            
+            # Convert any remaining JavaScript syntax to Processing
+            code = self._convert_to_processing(code)
             return code if self._is_safe_code(code) else None
             
         except Exception as e:
-            self.log.error(f"AI generation error: {e}")
+            self.log.error(f"AI generation error: {str(e)}")
+            self.log.debug(f"Current model: {self.current_model}, Selected model ID: {selected_model if 'selected_model' in locals() else 'not selected yet'}")
             return None
 
     def _build_generation_prompt(self, techniques: str) -> str:
@@ -75,6 +95,13 @@ Just remember to use Processing's Java-style syntax as your medium."""
         return f"""=== PROCESSING SKETCH GENERATOR ===
 Create an evolving visual artwork that explores form, motion, and pattern.
 Choose your approach thoughtfully - not every piece needs to use every technique.
+
+=== CRITICAL REQUIREMENTS ===
+• Use Processing (Java) syntax, NOT JavaScript
+• Use ASCII characters only in code and comments (no special characters like °, ©, etc.)
+• Initialize all variables when declaring them
+• Keep code clean and efficient
+• Use RGB values for colors (e.g., stroke(255, 0, 0) for red)
 
 === CREATIVE DIRECTION ===
 • Pick a clear creative direction for this piece
@@ -183,21 +210,42 @@ Let your creativity guide you—these are just starting points for your explorat
 
     def _extract_code_from_response(self, content: str) -> Optional[str]:
         """Extract and clean code from AI response"""
-        if "// YOUR CREATIVE CODE GOES HERE" not in content:
-            return content.strip()
-        
         try:
-            code_parts = content.split("// YOUR CREATIVE CODE GOES HERE")[1]
-            code_parts = code_parts.split("// END OF YOUR CREATIVE CODE")[0]
-            return code_parts.strip()
-        except IndexError:
+            # Clean special characters and ensure ASCII compatibility first
+            content = content.encode('ascii', 'ignore').decode()  # Remove non-ASCII chars
+            content = re.sub(r'[^\x00-\x7F]+', '', content)  # Additional non-ASCII cleanup
+            
+            if "// YOUR CREATIVE CODE GOES HERE" not in content:
+                self.log.debug("No code markers found, treating entire response as code")
+                return content.strip()
+            
+            code_parts = content.split("// YOUR CREATIVE CODE GOES HERE")
+            if len(code_parts) < 2:
+                self.log.debug("Could not split on start marker")
+                return None
+                
+            code = code_parts[1]
+            end_parts = code.split("// END OF YOUR CREATIVE CODE")
+            if len(end_parts) < 1:
+                self.log.debug("Could not split on end marker")
+                return None
+                
+            extracted = end_parts[0].strip()
+            if not extracted:
+                self.log.debug("Extracted code is empty")
+                return None
+                
+            return extracted
+            
+        except Exception as e:
+            self.log.error(f"Error extracting code: {str(e)}")
             return None
 
     def _is_safe_code(self, code: str) -> bool:
         """Check for forbidden elements in generated code"""
-        forbidden = ['void', 'setup(', 'draw(', 'background(', 
-                    'translate(', 'size(', 'framerate(']
-        return not any(forbidden in code.lower() for forbidden in forbidden)
+        forbidden_terms = ['void', 'setup(', 'draw(', 'background(', 
+                    'translate(', 'size(', 'framerate(', 'static']
+        return not any(term in code.lower() for term in forbidden_terms)
 
     def validate_creative_code(self, code: str) -> tuple[bool, str]:
         """Validate creative code for forbidden elements"""

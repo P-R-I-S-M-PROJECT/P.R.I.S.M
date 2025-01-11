@@ -19,6 +19,18 @@ class Config:
         self.data_dir = self.base_path / "data"
         self.data_dir.mkdir(exist_ok=True)
         
+        # Model configuration
+        self.model_config = {
+            'available_models': ['o1', 'o1-mini', '4o'],
+            'default_model': '4o',
+            'model_selection': 'random',  # 'random' or specific model name
+            'model_weights': {
+                '4o': 0.34,
+                'o1': 0.33,
+                'o1-mini': 0.33
+            }
+        }
+        
         # Initialize components
         self._metadata = None
         self._db_manager: 'DatabaseManager' = None
@@ -39,13 +51,14 @@ class Config:
     def _verify_required_files(self):
         """Verify all required files exist"""
         required_files = [
-            self.paths['template'],
-            *self.paths['docs'].values()
+            self.base_path / "auto.pde",
+            self.base_path / "scripts" / "run_sketches.ps1",
+            self.base_path / "scripts" / "ffmpeg.exe"
         ]
         
-        for path in required_files:
-            if not path.exists():
-                raise FileNotFoundError(f"Required file not found: {path}")
+        for file_path in required_files:
+            if not file_path.exists():
+                raise FileNotFoundError(f"Required file not found: {file_path}")
     
     @property
     def db_manager(self) -> 'DatabaseManager':
@@ -75,9 +88,6 @@ class Config:
         """Get important file paths"""
         return {
             'template': self.base_path / "auto.pde",
-            'docs': {
-                'history': self.base_path / "docs" / "history.md"
-            }
         }
     
     def initialize_metadata(self):
@@ -93,18 +103,17 @@ class Config:
                     'render_quality': 'P2D'
                 },
                 'generation': {
-                    'ai_parameters': {
-                        'model': 'random',
-                        'default_model': 'o1-mini',
-                        'available_models': ['o1-mini', '4o'],
-                        'model_weights': {
-                            'o1-mini': 0.5,
-                            '4o': 0.5
-                        }
-                    },
                     'constraints': {
                         'max_elements': 1000,
                         'min_frame_time': 16
+                    },
+                    'ai_parameters': {
+                        'last_used_model': None,
+                        'generation_stats': {
+                            'o1': {'uses': 0, 'avg_score': 0},
+                            'o1-mini': {'uses': 0, 'avg_score': 0},
+                            '4o': {'uses': 0, 'avg_score': 0}
+                        }
                     }
                 },
                 'creative_core': {
@@ -231,16 +240,43 @@ class Config:
             print(f"Error loading config: {e}")
             self.initialize_metadata()
     
+    def update_version_from_renders(self) -> int:
+        """Scan renders directory and update version tracking across system"""
+        try:
+            # Scan renders directory for latest version
+            renders_path = self.base_path / "renders"
+            if not renders_path.exists():
+                return 1
+                
+            versions = []
+            for dir_path in renders_path.glob("render_v*"):
+                try:
+                    version_str = dir_path.name.replace("render_v", "")
+                    version = int(version_str)
+                    versions.append(version)
+                except ValueError:
+                    continue
+            
+            next_version = max(versions, default=0) + 1
+            
+            # Update metadata
+            self.metadata['current_version'] = next_version - 1  # Current is last completed
+            self.save_metadata()
+            
+            # Update database if needed
+            if versions:  # Only if we found versions
+                latest_version = max(versions)
+                self.db_manager.ensure_version_exists(latest_version)
+            
+            return next_version
+            
+        except Exception as e:
+            self.log.error(f"Error updating version from renders: {e}")
+            return 1
+
     def get_next_version(self) -> int:
-        """Get next version number"""
-        if not self._metadata:
-            self.initialize_metadata()
-        
-        next_version = self._metadata['current_version'] + 1
-        self._metadata['current_version'] = next_version
-        self.save_metadata()
-        
-        return next_version
+        """Get next version number, scanning renders directory first"""
+        return self.update_version_from_renders()
     
     def _load_environment(self) -> Dict[str, str]:
         """Load required environment variables"""
@@ -248,3 +284,14 @@ class Config:
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable not found")
         return {'OPENAI_API_KEY': api_key}
+    
+    def get_model_config(self) -> Dict[str, Any]:
+        """Get current model configuration"""
+        return self.model_config
+    
+    def set_model_selection(self, mode: str):
+        """Set model selection mode ('random' or specific model name)"""
+        if mode == 'random' or mode in self.model_config['available_models']:
+            self.model_config['model_selection'] = mode
+        else:
+            raise ValueError(f"Invalid model selection mode: {mode}")
