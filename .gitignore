@@ -46,7 +46,7 @@ ENV/
 # Project Specific
 renders/
 data/*.db
-data/*.yaml
+data/metadata.yaml
 data/*.sqlite
 data/*.sqlite3
 *.log
