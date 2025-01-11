@@ -15,33 +15,35 @@ void setup() {
             translate(width/2, height/2);
             
             // YOUR CREATIVE CODE GOES HERE
-  int gridCount = 30;
-  float t = TWO_PI * progress;
-  float spacing = 800.0 / (float)gridCount;
-  float offset = -400.0 + spacing * 0.5;
-  noFill();
+  float numPetals = 12;
+  float maxRadius = 300;
+  float petalLength = 250;
+  float petalWidth = 50;
   
-  for(int i = 0; i < gridCount; i++){
-    for(int j = 0; j < gridCount; j++){
-      float x = offset + i * spacing;
-      float y = offset + j * spacing;
-      float r = sqrt(x * x + y * y);
-      float angle = atan2(y, x);
-      float wave = sin(r * 0.03 - angle * 4.0 + t * 2.0);
-      float rad = 5.0 + wave * 2.0;
+  // Loop over each petal
+  for (int i = 0; i < numPetals; i++) {
+      // Calculate the angle for this petal
+      float angle = map(i, 0, numPetals, 0, TWO_PI) + progress * TWO_PI;
       
-      stroke(
-        (int)(128 + 127 * sin(wave)),
-        (int)(128 + 127 * sin(wave * 2.0)),
-        (int)(128 + 127 * sin(wave * 3.0))
-      );
-      strokeWeight(1.0);
-      ellipse(x, y, rad, rad);
-    }
+      // Calculate the petal tip coordinates
+      float x1 = maxRadius * cos(angle);
+      float y1 = maxRadius * sin(angle);
+      float x2 = (maxRadius + petalLength) * cos(angle);
+      float y2 = (maxRadius + petalLength) * sin(angle);
+  
+      // Draw a petal with a line for the spine and two arcs as boundaries
+      stroke(255, 0, 150); // Pink color
+      strokeWeight(2);
+      line(x1, y1, x2, y2);
+      
+      noFill(); // No fill for the petal arches
+      stroke(100, 200, 255); // Light blue color
+      arc((x1 + x2)/2, (y1 + y2)/2, petalWidth, petalLength, angle + HALF_PI, angle - HALF_PI);
+      arc((x1 + x2)/2, (y1 + y2)/2, petalWidth, petalLength, angle - HALF_PI, angle + HALF_PI);
   }
   // END OF YOUR CREATIVE CODE
             
-            String renderPath = "renders/render_v2256";
+            String renderPath = "renders/render_v2288";
             saveFrame(renderPath + "/frame-####.png");
             if (frameCount >= totalFrames) {
                 exit();
