@@ -3,8 +3,6 @@ import subprocess
 from pathlib import Path
 import re
 from models.openai_4o import OpenAI4OGenerator
-from models.openai_o1 import OpenAIO1Generator
-from models.claude_generator import ClaudeGenerator
 from models.data_models import Pattern, Technique
 from logger import ArtLogger
 from pattern_analyzer import PatternAnalyzer
@@ -12,7 +10,6 @@ from config import Config
 import json
 import time
 import random
-import shutil
 
 class ProcessingGenerator:
     def __init__(self, config: Config, logger: ArtLogger = None):
@@ -348,6 +345,9 @@ Please fix these issues and return the corrected code."""
     def _save_code(self, code: str, version: int) -> None:
         """Save generated code to auto.pde"""
         try:
+            # Update render path with version
+            code = self._update_render_path(code, version)
+            
             # Save to auto.pde
             template_path = self.config.paths['template']
             with open(template_path, 'w') as f:
@@ -537,7 +537,7 @@ Return the code between the markers."""
         # Use the generator from ai_generators dictionary
         if model in self.ai_generators:
             generator = self.ai_generators[model]
-            generator.current_model = model  # Set the model on the generator instance
+            # Each generator handles its own model selection
             return generator.generate_with_ai(technique_str)
         else:
             self.log.error(f"Unknown model: {model}")

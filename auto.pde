@@ -1,77 +1,24 @@
 // === USER'S CREATIVE CODE ===
-// Parameters for spiral particles
-int numParticles = 200;
-Particle[] particles;
-float baseRadius = 250;
-
-class Particle {
-    float angle;
-    float radius;
-    float speed;
-    float phase;
-    int hue;
-    
-    Particle(float initAngle) {
-        angle = initAngle;
-        radius = random(50, baseRadius);
-        speed = random(0.5, 2.0);
-        phase = random(TWO_PI);
-        hue = int(random(180, 255));
-    }
-    
-    void update(float progress) {
-        angle += 0.02 * speed;
-        float wobble = sin(progress * TWO_PI * 2 + phase) * 20;
-        float currentRadius = radius + wobble;
-        
-        float x = cos(angle) * currentRadius;
-        float y = sin(angle) * currentRadius;
-        
-        float size = map(sin(progress * TWO_PI + phase), -1, 1, 2, 8);
-        
-        stroke(hue, 200, 255, 150);
-        strokeWeight(size);
-        point(x, y);
-        
-        // Draw connecting lines with fading opacity
-        if (currentRadius < baseRadius - 30) {
-            float nextX = cos(angle + 0.1) * (currentRadius + 10);
-            float nextY = sin(angle + 0.1) * (currentRadius + 10);
-            stroke(hue, 200, 255, 50);
-            strokeWeight(0.5);
-            line(x, y, nextX, nextY);
-        }
-    }
+void runSketch(float progress) {
+  int numLines = 100;
+  float maxRadius = 300;
+  for (int i = 0; i < numLines; i++) {
+    float angle = TWO_PI * i / numLines;
+    float radius = maxRadius * sin(progress * PI + angle);
+    float x1 = radius * cos(angle);
+    float y1 = radius * sin(angle);
+    float x2 = maxRadius * cos(angle);
+    float y2 = maxRadius * sin(angle);
+    stroke(255 - (i * 255 / numLines), 100, i * 255 / numLines);
+    line(x1, y1, x2, y2);
+  }
 }
 
 void initSketch() {
-    colorMode(HSB, 255);
-    particles = new Particle[numParticles];
-    for (int i = 0; i < numParticles; i++) {
-        particles[i] = new Particle(random(TWO_PI));
-    }
+  // Initialize sketch
 }
+// END OF YOUR CREATIVE CODE
 
-void runSketch(float progress) {
-    // Add subtle rotation to entire system
-    rotate(progress * TWO_PI * 0.25);
-    
-    // Draw circular guide
-    noFill();
-    stroke(180, 50, 255, 30);
-    strokeWeight(1);
-    ellipse(0, 0, baseRadius * 2, baseRadius * 2);
-    
-    // Update and draw particles
-    for (Particle p : particles) {
-        p.update(progress);
-    }
-    
-    // Draw central point
-    stroke(200, 255, 255);
-    strokeWeight(4);
-    point(0, 0);
-}
 // === SYSTEM FRAMEWORK ===
 void setup() {
     size(800, 800);
@@ -92,7 +39,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v2352";
+        String renderPath = "renders/render_v2348";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();
