@@ -44,11 +44,10 @@ ENV/
 .classpath
 
 # Project Specific
-renders/
-data/*.db
-data/metadata.yaml
-data/*.sqlite
-data/*.sqlite3
+renders/*
+!renders/.gitkeep
+data/*
+!data/.gitkeep
 *.log
 logs/
 temp/
