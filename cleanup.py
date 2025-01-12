@@ -35,40 +35,44 @@ class SystemCleaner:
         if not renders_path.exists():
             return
 
-        # Create archives directory if it doesn't exist
-        archives_dir = renders_path / "archives"
-        archives_dir.mkdir(parents=True, exist_ok=True)
+        # Create snapshots directory if it doesn't exist
+        snapshots_dir = renders_path / "snapshots"
+        snapshots_dir.mkdir(parents=True, exist_ok=True)
 
         # Find all sketch files in render directories
         sketch_files = []
         for render_dir in renders_path.glob("render_v*"):
             if render_dir.is_dir():
-                for sketch_file in render_dir.glob("sketch_v*.pde"):
+                for sketch_file in render_dir.glob("render_v*.pde"):
                     sketch_files.append(sketch_file)
 
         if not sketch_files:
             return
 
-        # Create timestamped archive folder
+        # Create timestamped snapshot folder
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        archive_dir = archives_dir / timestamp
-        archive_dir.mkdir(exist_ok=True)
+        snapshot_dir = snapshots_dir / timestamp
+        snapshot_dir.mkdir(exist_ok=True)
 
         self.log.info(f"Archiving {len(sketch_files)} sketch files...")
         for sketch_file in sketch_files:
             try:
-                shutil.copy2(str(sketch_file), str(archive_dir / sketch_file.name))
+                shutil.copy2(str(sketch_file), str(snapshot_dir / sketch_file.name))
                 self.log.success(f"Archived {sketch_file.name}")
             except Exception as e:
                 self.log.error(f"Failed to archive {sketch_file.name}: {e}")
     
     def _cleanup_renders(self):
-        """Clear renders directory"""
+        """Clear renders directory while preserving snapshots"""
         renders_path = self.config.base_path / "renders"
         if renders_path.exists():
             self.log.info("Clearing renders directory...")
             for item in renders_path.iterdir():
                 try:
+                    # Skip the snapshots directory
+                    if item.name == "snapshots":
+                        continue
+                        
                     if item.is_dir():
                         shutil.rmtree(item)
                     else:
