@@ -89,7 +89,7 @@ class Config:
     @property
     def api_key(self) -> str:
         """Get OpenAI API key"""
-        return self.env['OPENAI_API_KEY']
+        return self.openai_key
     
     @property
     def metadata(self) -> Dict[str, Any]:

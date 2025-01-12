@@ -5,6 +5,7 @@ from logger import ArtLogger
 from config import Config
 import random
 import os
+import subprocess
 
 class ClaudeGenerator:
     def __init__(self, config: Config, logger: ArtLogger = None):
@@ -44,9 +45,20 @@ class ClaudeGenerator:
             structured_prompt = self._build_generation_prompt(prompt)
             
             # Add system prompt for creative coding context
-            system_prompt = """You're a creative coder crafting generative art with Processing. 
-Express your artistic vision through code - feel free to experiment and innovate.
-Just remember to use Processing's Java-style syntax as your medium."""
+            system_prompt = """You are a creative coder crafting generative art with Processing.
+Your task is to write ONLY the creative code that will be inserted into a template.
+DO NOT write setup() or draw() functions - these are handled by the template.
+DO NOT use translate(), background(), size(), or frameRate() - these are handled by the template.
+
+The template provides:
+- Canvas setup (800x800)
+- Origin translation to center
+- Background clearing
+- Frame rate control
+- Progress variable (0.0 to 1.0)
+
+Focus on writing the actual creative code that will be inserted into the draw() function.
+Return ONLY the code that creates the visual elements."""
             
             # Log the full prompt being sent
             self.log.debug(f"\n=== SENDING TO AI ===\nSystem: {system_prompt}\nUser: {structured_prompt}\n==================\n")
@@ -55,50 +67,38 @@ Just remember to use Processing's Java-style syntax as your medium."""
             selected_model = self._select_claude_model(self.current_model)
             self.log.debug(f"Using model ID: {selected_model} (from {self.current_model})")
             
-            try:
-                response = self.client.messages.create(
-                    model=selected_model,
-                    max_tokens=4096,  # Increased for complex patterns
-                    messages=[
-                        {"role": "user", "content": structured_prompt}
-                    ],
-                    system=system_prompt,  # Using proper system prompt parameter
-                    temperature=0.9,  # Higher temperature for creative tasks
-                    stop_sequences=["// END OF YOUR CREATIVE CODE"]  # Use stop sequence for better control
-                )
-                
-                # Log the complete API response for debugging
-                self.log.debug("\n=== COMPLETE API RESPONSE ===")
-                self.log.debug(f"Response object type: {type(response)}")
-                self.log.debug(f"Response dir: {dir(response)}")
-                for attr in ['id', 'model', 'role', 'content', 'stop_reason', 'stop_sequence', 'usage']:
-                    try:
-                        value = getattr(response, attr)
-                        self.log.debug(f"{attr}: {value}")
-                    except AttributeError:
-                        self.log.debug(f"{attr}: Not available")
-                self.log.debug("==================\n")
-                
-            except Exception as api_error:
-                self.log.error(f"Claude API Error: {str(api_error)}")
-                self.log.debug(f"API Error type: {type(api_error)}")
-                self.log.debug(f"API Error details: {dir(api_error)}")
-                return None
+            response = self.client.messages.create(
+                model=selected_model,
+                max_tokens=4096,
+                messages=[
+                    {"role": "user", "content": structured_prompt}
+                ],
+                system=system_prompt,
+                temperature=0.9,
+                stop_sequences=["// END OF YOUR CREATIVE CODE"]
+            )
             
             if not response.content:
-                self.log.error("No response content generated from AI")
+                self.log.error("No response generated from AI")
                 return None
                 
-            # Log the raw response content
+            # Log the raw response first
             raw_content = response.content[0].text if response.content else "No content"
-            self.log.debug(f"\n=== AI RESPONSE CONTENT ===\n{raw_content}\n==================\n")
+            self.log.debug(f"\n=== AI RESPONSE ===\n{raw_content}\n==================\n")
             
-            # Extract and validate code
+            # Then try to log any available metadata
+            self.log.debug("\n=== RESPONSE METADATA ===")
+            try:
+                self.log.debug(f"Model: {response.model}")
+                self.log.debug(f"Usage: {response.usage}")
+            except AttributeError as e:
+                self.log.debug(f"Some metadata not available: {e}")
+            self.log.debug("==================\n")
+            
             code = self._extract_code_from_response(raw_content)
             if not code:
                 self.log.debug("Failed to extract code from response")
-                self.log.debug(f"Raw content received: {raw_content}")
-                return None
+                return raw_content.strip()  # Return the raw content if no markers found
                 
             # Log the extracted code
             self.log.debug(f"\n=== EXTRACTED CODE ===\n{code}\n==================\n")
@@ -109,20 +109,58 @@ Just remember to use Processing's Java-style syntax as your medium."""
                 self.log.debug(f"\n=== VALIDATION ERROR ===\nCreative validation failed: {error_msg}\n==================\n")
                 raise ValueError(f"Creative validation: {error_msg}")
             
-            # Convert any remaining JavaScript syntax to Processing
-            code = self._convert_to_processing(code)
-            
             # Final safety check
             if not self._is_safe_code(code):
                 self.log.debug("\n=== VALIDATION ERROR ===\nFailed final safety check\n==================\n")
                 return None
                 
+            # Save ONLY the creative code to auto.pde
+            auto_pde = self.config.base_path / "auto.pde"
+            with open(auto_pde, 'r') as f:
+                template = f.read()
+            
+            # Update render path in template
+            next_version = self.config.get_next_version()
+            template = re.sub(
+                r'String\s+renderPath\s*=\s*"renders/render_v\d+"',
+                f'String renderPath = "renders/render_v{next_version}"',
+                template
+            )
+            
+            # Insert between markers - note the exact marker text from auto.pde
+            start_marker = "// === USER'S CREATIVE CODE ==="
+            end_marker = "// === SYSTEM FRAMEWORK ==="
+            
+            parts = template.split(start_marker)
+            if len(parts) != 2:
+                self.log.error("Could not find start marker in template")
+                return None
+            
+            before_marker = parts[0]
+            parts = parts[1].split(end_marker)
+            if len(parts) != 2:
+                self.log.error("Could not find end marker in template")
+                return None
+            
+            after_marker = parts[1]
+            
+            # Combine with template, preserving the exact marker format
+            full_code = (
+                before_marker + 
+                start_marker + "\n" + 
+                code + "\n" + 
+                end_marker + 
+                after_marker
+            )
+            
+            with open(auto_pde, 'w') as f:
+                f.write(full_code)
+            
+            self.log.info(f"Code saved to {auto_pde}")
             return code
             
         except Exception as e:
             self.log.error(f"AI generation error: {str(e)}")
-            self.log.debug(f"Error type: {type(e)}")
-            self.log.debug(f"Error details: {dir(e)}")
             self.log.debug(f"Current model: {self.current_model}")
             self.log.debug(f"Selected model ID: {selected_model if 'selected_model' in locals() else 'not selected yet'}")
             return None
@@ -290,39 +328,23 @@ Return your code between these markers:
             return code
 
     def validate_creative_code(self, code: str) -> tuple[bool, str]:
-        """Validate creative code for forbidden elements, being more lenient with fixable issues"""
+        """Validate creative code for forbidden elements"""
         if not code.strip():
             return False, "Empty code"
         
-        # Extract just the user's code portion
-        user_code = self._extract_between_markers(
-            code,
-            "// YOUR CREATIVE CODE GOES HERE",
-            "// END OF YOUR CREATIVE CODE"
-        )
-        
-        # Only check for critical system-level functions that would break the sketch
+        # Check for critical forbidden elements
         critical_forbidden = {
             'setup(': 'Contains setup()',
             'draw(': 'Contains draw()',
             'background(': 'Contains background()',
             'size(': 'Contains size()',
             'frameRate(': 'Contains frameRate()',
+            'translate(width/2': 'Contains origin re-centering'
         }
         
-        # Check for critical forbidden elements
         for term, error in critical_forbidden.items():
-            if term in user_code:
+            if term in code:
                 return False, error
-        
-        # Check for absolute translations that would re-center the origin
-        for line in user_code.split('\n'):
-            line = line.strip()
-            if any(x in line for x in [
-                'translate(width/2', 'translate( width/2', 'translate(width / 2',
-                'translate(height/2', 'translate( height/2', 'translate(height / 2'
-            ]):
-                return False, "Contains origin re-centering - coordinates are already centered"
         
         return True, None
 
@@ -373,30 +395,107 @@ Return your code between these markers:
         return code 
 
     def _is_safe_code(self, code: str) -> bool:
-        """Less strict validation of Processing syntax, focusing on critical issues"""
-        errors = []
-        
-        # Extract just the user's code portion
-        user_code = self._extract_between_markers(
-            code,
-            "// YOUR CREATIVE CODE GOES HERE",
-            "// END OF YOUR CREATIVE CODE"
-        )
-        
+        """Basic safety validation"""
         # Only check for critical JavaScript syntax that can't be auto-fixed
         critical_js_patterns = [
-            (r'color\(([\'"]#[0-9a-fA-F]+[\'"]\))', "Use RGB values instead of hex codes: color(255, 0, 0)"),
-            (r'\b(push|pop)\s*\(\s*\)', "Use pushMatrix()/popMatrix() instead of push()/pop()"),
-            (r'createVector\s*\(', "Use 'new PVector()' instead of createVector()"),
+            (r'color\(([\'"]#[0-9a-fA-F]+[\'"]\))', "Use RGB values instead of hex codes"),
+            (r'\b(push|pop)\s*\(\s*\)', "Use pushMatrix()/popMatrix()"),
+            (r'createVector\s*\(', "Use 'new PVector()'"),
         ]
         
         for pattern, error in critical_js_patterns:
-            if re.search(pattern, user_code):
-                errors.append(error)
+            if re.search(pattern, code):
+                self.log.error(f"Critical JavaScript syntax found: {error}")
+                return False
         
-        if errors:
-            error_msg = "\n• ".join(errors)
-            self.log.error(f"Critical JavaScript syntax found:\n• {error_msg}")
+        return True
+
+    def _validate_code(self, code: str) -> bool:
+        """Validate the generated code"""
+        # Check for required functions
+        if "void initSketch()" not in code or "void runSketch(float progress)" not in code:
+            self.log.error("Missing required functions")
             return False
+            
+        # Check for forbidden elements
+        forbidden = [
+            "void setup()",
+            "void draw()",
+            "size(",
+            "frameRate(",
+            "background(",
+            "translate(width/2",
+            "saveFrame(",
+            "exit()"
+        ]
         
+        for item in forbidden:
+            if item in code:
+                self.log.error(f"Contains forbidden element: {item}")
+                return False
+                
         return True 
+
+    def _run_sketch(self, version: int) -> bool:
+        """Run a Processing sketch with the generated code"""
+        try:
+            # Read the template
+            auto_pde = self.config.base_path / "auto.pde"
+            with open(auto_pde, 'r') as f:
+                template = f.read()
+            
+            # Update renderPath in template using regex
+            template = re.sub(
+                r'String\s+renderPath\s*=\s*"renders/render_v\d+"',
+                f'String renderPath = "renders/render_v{version}"',
+                template
+            )
+            
+            # Insert between markers
+            start_marker = "// === USER'S CREATIVE CODE ==="
+            end_marker = "// === SYSTEM FRAMEWORK ==="
+            
+            parts = template.split(start_marker)
+            if len(parts) != 2:
+                self.log.error("Could not find start marker in template")
+                return False
+            
+            before_marker = parts[0]
+            parts = parts[1].split(end_marker)
+            if len(parts) != 2:
+                self.log.error("Could not find end marker in template")
+                return False
+            
+            after_marker = parts[1]
+            
+            # Combine with template, preserving the exact marker format
+            full_code = (
+                before_marker + 
+                start_marker + "\n" + 
+                self.current_code + "\n" + 
+                end_marker + 
+                after_marker
+            )
+            
+            # Save to auto.pde
+            with open(auto_pde, 'w') as f:
+                f.write(full_code)
+            
+            self.log.info(f"Code saved to {auto_pde}")
+            
+            # Run the PowerShell script
+            ps_script = self.config.base_path / "scripts" / "run_sketches.ps1"
+            cmd = f'powershell -File "{ps_script}" -RenderPath "render_v{version}"'
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                self.log.error(f"Sketch execution failed: {result.stdout}\n{result.stderr}")
+                return False
+            
+            self.log.info(f"Sketch executed successfully: {result.stdout}")
+            return True
+            
+        except Exception as e:
+            self.log.error(f"Error running sketch: {str(e)}")
+            return False 

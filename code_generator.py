@@ -25,6 +25,7 @@ class ProcessingGenerator:
         from models.openai_4o import OpenAI4OGenerator
         from models.claude_generator import ClaudeGenerator
         
+        # Create single instances
         self.o1_generator = OpenAIO1Generator(config, self.log)
         self.o4_generator = OpenAI4OGenerator(config, self.log)
         self.claude_generator = ClaudeGenerator(config, self.log)
@@ -36,13 +37,14 @@ class ProcessingGenerator:
         self._current_techniques = []
         self._current_complexity = 0.7  # Default values
         self._current_innovation = 0.5  # Default values
-        # Initialize AI generators
+        
+        # Initialize AI generators dictionary using existing instances
         self.ai_generators = {
-            'o1': OpenAIO1Generator(config, self.log),
-            'o1-mini': OpenAIO1Generator(config, self.log),
-            '4o': OpenAI4OGenerator(config, self.log),
-            'claude-3-opus': ClaudeGenerator(config, self.log),
-            'claude-3-sonnet': ClaudeGenerator(config, self.log)
+            'o1': self.o1_generator,
+            'o1-mini': self.o1_generator,  # Same instance for both O1 variants
+            '4o': self.o4_generator,
+            'claude-3-opus': self.claude_generator,  # Same instance for both Claude variants
+            'claude-3.5-sonnet': self.claude_generator
         }
         self._current_model = None
     
@@ -529,15 +531,14 @@ Return the code between the markers."""
         # Convert techniques to string if they're not already
         technique_str = techniques if isinstance(techniques, str) else ', '.join(techniques)
         
-        if model.startswith('claude'):
-            # Use Claude generator
-            return self.claude_generator.generate_with_ai(technique_str)
-        elif model in ['o1', 'o1-mini']:
-            # Use O1 generator
-            return self.o1_generator.generate_with_ai(technique_str)
-        elif model == '4o':
-            # Use 4O generator
-            return self.o4_generator.generate_with_ai(technique_str)
+        # Set the current model before generation
+        self._current_model = model
+        
+        # Use the generator from ai_generators dictionary
+        if model in self.ai_generators:
+            generator = self.ai_generators[model]
+            generator.current_model = model  # Set the model on the generator instance
+            return generator.generate_with_ai(technique_str)
         else:
             self.log.error(f"Unknown model: {model}")
             return None

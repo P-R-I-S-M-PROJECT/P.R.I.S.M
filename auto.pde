@@ -1,86 +1,33 @@
 // === USER'S CREATIVE CODE ===
-// ------------------------------------------------------
-// 1) (OPTIONAL) CLASSES OR HELPER FUNCTIONS
-// ------------------------------------------------------
-
-ArrayList<PVector> superellipsePoints;
-PGraphics pg;
-
-// Create a set of points along a superellipse
-ArrayList<PVector> makeSuperellipse(float radius, float exponent, int resolution) {
-  ArrayList<PVector> pts = new ArrayList<PVector>();
-  for (int i = 0; i < resolution; i++) {
-    float t = map(i, 0, resolution, 0, TWO_PI);
-    float x = pow(abs(cos(t)), 2.0/exponent);
-    float y = pow(abs(sin(t)), 2.0/exponent);
-    // Retain sign so we get the "superellipse" in all quadrants
-    x *= cos(t) < 0 ? -radius : radius;
-    y *= sin(t) < 0 ? -radius : radius;
-    pts.add(new PVector(x, y));
-  }
-  return pts;
-}
-
-// ------------------------------------------------------
-// 2) DECLARE GLOBAL VARIABLES
-// ------------------------------------------------------
-// (They are at the top: "pg" and "superellipsePoints")
-
-// ------------------------------------------------------
-// 3) initSketch() - Called ONCE at the start
-// ------------------------------------------------------
-void initSketch() {
-  // Create an offscreen buffer for a feedback-like effect
-  pg = createGraphics(width, height);
-
-  // Generate superellipse shape points
-  superellipsePoints = makeSuperellipse(280, 2.5, 240);
-
-  // Optional: set color mode on our buffer
-  pg.beginDraw();
-  pg.colorMode(HSB, 255);
-  pg.endDraw();
-}
-
-// ------------------------------------------------------
-// 4) runSketch(progress) - Called EACH FRAME
-//    progress goes from 0.0 to 1.0 over 6 seconds
-// ------------------------------------------------------
 void runSketch(float progress) {
-  // Begin drawing in the offscreen buffer
-  pg.beginDraw();
-
-  // Fade out the previous frame slightly for a feedback-like effect
-  pg.noStroke();
-  pg.fill(0, 10); // Very gentle fade
-  pg.rect(0, 0, pg.width, pg.height);
-
-  pg.pushMatrix();
-  // Move to center of pg
-  pg.translate(pg.width/2, pg.height/2);
-
-  // Gradually rotate over one full turn as progress goes from 0..1
-  float angle = progress * TWO_PI;
-  pg.rotate(angle);
-
-  // Let the hue shift over progress
-  float hueVal = (progress * 255) % 255;
-
-  // Draw the superellipse shape
-  pg.stroke(hueVal, 255, 255, 150);
-  pg.noFill();
-
-  pg.beginShape();
-  for (PVector pt : superellipsePoints) {
-    pg.vertex(pt.x, pt.y);
+  int numPetals = 8; // Number of petals in our flower-like shape
+  float radius = 150; // Radius of the floral structure
+  for (int i = 0; i < numPetals; i++) {
+      float angleOffset = TWO_PI / numPetals; // Offset angle for each petal
+      float petalAngle = i * angleOffset + progress * TWO_PI; // Calculate current angle of each petal
+      float x1 = cos(petalAngle) * radius;
+      float y1 = sin(petalAngle) * radius;
+      float x2 = cos(petalAngle + angleOffset / 2) * radius / 2;
+      float y2 = sin(petalAngle + angleOffset / 2) * radius / 2;
+      stroke(255 * abs(sin(petalAngle)), 100, 255 * abs(cos(petalAngle)));
+      strokeWeight(3);
+      noFill();
+      bezier(0, 0, x1, y1, x2, y2, -x1, -y1); // Draw a bezier curve for each petal
   }
-  pg.endShape(CLOSE);
+  float particleRadius = 280;
+  int numParticles = 20;
+  for (int j = 0; j < numParticles; j++) {
+      float particleAngle = j * TWO_PI / numParticles + progress * TWO_PI; // Calculate particle angle based on progress
+      float px = cos(particleAngle) * particleRadius;
+      float py = sin(particleAngle) * particleRadius;
+      stroke(255);
+      strokeWeight(2);
+      point(px, py); // Draw the particle as a point
+  }
+}
 
-  pg.popMatrix();
-  pg.endDraw();
-
-  // Draw our offscreen buffer onto the main canvas (already centered)
-  image(pg, -width/2, -height/2);
+void initSketch() {
+  // Initialize sketch
 }
 // END OF YOUR CREATIVE CODE
 
@@ -104,7 +51,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v2343";
+        String renderPath = "renders/render_v2344";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();
