@@ -14,13 +14,15 @@ from models import Pattern
 from tests import TestRunner
 import json
 from typing import Dict
+import sys
 
 # Load environment variables
 load_dotenv()
 
 class PRISM:
     def __init__(self, config: Config):
-        self.log = ArtLogger(debug_enabled=False)
+        self.debug_mode = False
+        self.log = ArtLogger(debug_enabled=self.debug_mode)
         self.config = config
         self.db = config.db_manager
         
@@ -84,8 +86,7 @@ Top Technique Combinations:""")
             elif choice == "2":
                 self.cleanup_system()
             elif choice == "3":
-                self.log.set_debug(not self.log.debug_enabled)
-                self.log.info(f"Debug mode {'enabled' if self.log.debug_enabled else 'disabled'}")
+                self.toggle_debug_mode()
             elif choice == "4":
                 self.test_runner.test_o1_models()
             elif choice == "5":
@@ -276,6 +277,47 @@ Top Technique Combinations:""")
                 
         except Exception as e:
             self.log.error(f"Error syncing videos: {e}")
+    
+    def toggle_debug_mode(self):
+        """Toggle debug mode and update all components"""
+        self.debug_mode = not self.debug_mode
+        self.log.set_debug(self.debug_mode)
+        
+        # Update debug mode for all components
+        self.generator.log.set_debug(self.debug_mode)
+        self.docs.log.set_debug(self.debug_mode)
+        self.evolution.log.set_debug(self.debug_mode)
+        self.cleaner.log.set_debug(self.debug_mode)
+        self.test_runner.log.set_debug(self.debug_mode)
+        
+        status = "enabled" if self.debug_mode else "disabled"
+        self.log.info(f"Debug mode {status}")
+        
+        # If enabling debug mode, log system info
+        if self.debug_mode:
+            self._log_system_info()
+            
+    def _log_system_info(self):
+        """Log detailed system information when debug mode is enabled"""
+        self.log.debug("\n=== SYSTEM INFORMATION ===")
+        self.log.debug(f"Python version: {sys.version}")
+        self.log.debug(f"Current working directory: {os.getcwd()}")
+        self.log.debug(f"Environment variables: {list(os.environ.keys())}")
+        
+        # Log model configuration
+        if hasattr(self.config, 'model_weights'):
+            self.log.debug(f"Model weights: {self.config.model_weights}")
+        
+        # Log API keys (presence only, not values)
+        api_keys = {
+            'OPENAI_API_KEY': bool(os.getenv('OPENAI_API_KEY')),
+            'ANTHROPIC_API_KEY': bool(os.getenv('ANTHROPIC_API_KEY'))
+        }
+        self.log.debug(f"API Keys present: {api_keys}")
+        
+        # Log current debug state
+        self.log.debug(f"Debug mode: {self.debug_mode}")
+        self.log.debug("==================\n")
 
 if __name__ == "__main__":
     config = Config()

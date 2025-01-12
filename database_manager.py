@@ -547,3 +547,14 @@ class DatabaseManager:
                     )
                 """, (version,))
                 conn.commit()
+    
+    def get_next_version(self) -> int:
+        """Get next version number from database"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT MAX(version) FROM patterns")
+            max_version = cursor.fetchone()[0]
+            return (max_version or 0) + 1
+        except Exception as e:
+            self.log.error(f"Error getting next version: {e}")
+            return 1

@@ -10,12 +10,23 @@ if TYPE_CHECKING:
 
 class Config:
     def __init__(self):
+        """Initialize configuration"""
         # Load environment variables
         load_dotenv()
-        self.env = self._load_environment()
+        
+        # Get API keys
+        self.openai_key = os.getenv('OPENAI_API_KEY')
+        self.anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        
+        if not self.openai_key:
+            raise ValueError("OPENAI_API_KEY environment variable not found")
+        if not self.anthropic_key:
+            raise ValueError("ANTHROPIC_API_KEY environment variable not found")
+            
+        # Set base path
+        self.base_path = Path(os.getcwd())
         
         # Set up paths
-        self.base_path = Path(__file__).parent
         self.data_dir = self.base_path / "data"
         self.data_dir.mkdir(exist_ok=True)
         

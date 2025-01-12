@@ -9,7 +9,10 @@ class OpenAI4OGenerator:
     def __init__(self, config: Config, logger: ArtLogger = None):
         self.config = config
         self.log = logger or ArtLogger()
-        self.client = OpenAI(api_key=config.api_key)
+        self.client = OpenAI(api_key=config.openai_key)
+        
+        # Track current model
+        self.current_model = None
     
     def generate_with_ai(self, prompt: str, temperature: float = 0.85) -> Optional[str]:
         """Generate code using OpenAI API with better error handling"""

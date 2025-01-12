@@ -9,7 +9,7 @@ class OpenAIO1Generator:
     def __init__(self, config: Config, logger: ArtLogger = None):
         self.config = config
         self.log = logger or ArtLogger()
-        self.client = OpenAI(api_key=config.api_key)
+        self.client = OpenAI(api_key=config.openai_key)
         # Track current model
         self.current_model = None
         # Model ID mapping

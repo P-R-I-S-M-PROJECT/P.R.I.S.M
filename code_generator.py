@@ -16,10 +16,22 @@ import shutil
 
 class ProcessingGenerator:
     def __init__(self, config: Config, logger: ArtLogger = None):
+        """Initialize the code generator with configuration"""
         self.config = config
-        self.db = config.db_manager
         self.log = logger or ArtLogger()
+        
+        # Initialize model generators
+        from models.openai_o1 import OpenAIO1Generator
+        from models.openai_4o import OpenAI4OGenerator
+        from models.claude_generator import ClaudeGenerator
+        
+        self.o1_generator = OpenAIO1Generator(config, self.log)
+        self.o4_generator = OpenAI4OGenerator(config, self.log)
+        self.claude_generator = ClaudeGenerator(config, self.log)
+        
+        # Initialize pattern analyzer
         self.analyzer = PatternAnalyzer(config, self.log)
+        
         # Initialize current state tracking
         self._current_techniques = []
         self._current_complexity = 0.7  # Default values
@@ -509,3 +521,23 @@ Return the code between the markers."""
         except Exception as e:
             self.log.error(f"Error determining next version: {e}")
             return 1
+    
+    def generate_with_model(self, model: str, techniques: List[str]) -> Optional[str]:
+        """Generate code using a specific model"""
+        self.log.debug(f"Generating with model: {model}")
+        
+        # Convert techniques to string if they're not already
+        technique_str = techniques if isinstance(techniques, str) else ', '.join(techniques)
+        
+        if model.startswith('claude'):
+            # Use Claude generator
+            return self.claude_generator.generate_with_ai(technique_str)
+        elif model in ['o1', 'o1-mini']:
+            # Use O1 generator
+            return self.o1_generator.generate_with_ai(technique_str)
+        elif model == '4o':
+            # Use 4O generator
+            return self.o4_generator.generate_with_ai(technique_str)
+        else:
+            self.log.error(f"Unknown model: {model}")
+            return None

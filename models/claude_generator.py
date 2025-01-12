@@ -4,12 +4,21 @@ from anthropic import Anthropic
 from logger import ArtLogger
 from config import Config
 import random
+import os
 
 class ClaudeGenerator:
     def __init__(self, config: Config, logger: ArtLogger = None):
         self.config = config
         self.log = logger or ArtLogger()
-        self.client = Anthropic(api_key=config.api_key)
+        
+        # Get API key from environment
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+        if not api_key:
+            raise ValueError("ANTHROPIC_API_KEY not found in environment")
+            
+        self.log.debug(f"Initializing Claude with API key: {api_key[:8]}...")
+        self.client = Anthropic(api_key=api_key)
+        
         # Track current model
         self.current_model = None
         # Model ID mapping
@@ -34,51 +43,62 @@ class ClaudeGenerator:
             # Build a focused creative prompt
             structured_prompt = self._build_generation_prompt(prompt)
             
-            # Add artistic context prefix
-            context = """You're a creative coder crafting generative art with Processing. 
+            # Add system prompt for creative coding context
+            system_prompt = """You're a creative coder crafting generative art with Processing. 
 Express your artistic vision through code - feel free to experiment and innovate.
 Just remember to use Processing's Java-style syntax as your medium."""
             
-            full_prompt = context + "\n\n" + structured_prompt
-            
             # Log the full prompt being sent
-            self.log.debug(f"\n=== SENDING TO AI ===\n{full_prompt}\n==================\n")
+            self.log.debug(f"\n=== SENDING TO AI ===\nSystem: {system_prompt}\nUser: {structured_prompt}\n==================\n")
             
             # Use the model that was selected
             selected_model = self._select_claude_model(self.current_model)
             self.log.debug(f"Using model ID: {selected_model} (from {self.current_model})")
             
-            response = self.client.messages.create(
-                model=selected_model,
-                max_tokens=3500,
-                temperature=0.85,
-                messages=[
-                    {"role": "user", "content": full_prompt}
-                ]
-            )
+            try:
+                response = self.client.messages.create(
+                    model=selected_model,
+                    max_tokens=4096,  # Increased for complex patterns
+                    messages=[
+                        {"role": "user", "content": structured_prompt}
+                    ],
+                    system=system_prompt,  # Using proper system prompt parameter
+                    temperature=0.9,  # Higher temperature for creative tasks
+                    stop_sequences=["// END OF YOUR CREATIVE CODE"]  # Use stop sequence for better control
+                )
+                
+                # Log the complete API response for debugging
+                self.log.debug("\n=== COMPLETE API RESPONSE ===")
+                self.log.debug(f"Response object type: {type(response)}")
+                self.log.debug(f"Response dir: {dir(response)}")
+                for attr in ['id', 'model', 'role', 'content', 'stop_reason', 'stop_sequence', 'usage']:
+                    try:
+                        value = getattr(response, attr)
+                        self.log.debug(f"{attr}: {value}")
+                    except AttributeError:
+                        self.log.debug(f"{attr}: Not available")
+                self.log.debug("==================\n")
+                
+            except Exception as api_error:
+                self.log.error(f"Claude API Error: {str(api_error)}")
+                self.log.debug(f"API Error type: {type(api_error)}")
+                self.log.debug(f"API Error details: {dir(api_error)}")
+                return None
             
             if not response.content:
-                self.log.error("No response generated from AI")
+                self.log.error("No response content generated from AI")
                 return None
                 
-            # Log the raw response first (this is safe)
-            raw_content = response.content[0].text
-            self.log.debug(f"\n=== AI RESPONSE ===\n{raw_content}\n==================\n")
+            # Log the raw response content
+            raw_content = response.content[0].text if response.content else "No content"
+            self.log.debug(f"\n=== AI RESPONSE CONTENT ===\n{raw_content}\n==================\n")
             
-            # Then try to log any available metadata
-            self.log.debug("\n=== RESPONSE METADATA ===")
-            try:
-                self.log.debug(f"Model: {response.model}")
-                self.log.debug(f"Usage: {response.usage}")
-                self.log.debug(f"Created: {response.created}")
-            except AttributeError as e:
-                self.log.debug(f"Some metadata not available: {e}")
-            self.log.debug("==================\n")
-            
+            # Extract and validate code
             code = self._extract_code_from_response(raw_content)
             if not code:
                 self.log.debug("Failed to extract code from response")
-                return raw_content.strip()  # Return the raw content if no markers found
+                self.log.debug(f"Raw content received: {raw_content}")
+                return None
                 
             # Log the extracted code
             self.log.debug(f"\n=== EXTRACTED CODE ===\n{code}\n==================\n")
@@ -101,7 +121,10 @@ Just remember to use Processing's Java-style syntax as your medium."""
             
         except Exception as e:
             self.log.error(f"AI generation error: {str(e)}")
-            self.log.debug(f"Current model: {self.current_model}, Selected model ID: {selected_model if 'selected_model' in locals() else 'not selected yet'}")
+            self.log.debug(f"Error type: {type(e)}")
+            self.log.debug(f"Error details: {dir(e)}")
+            self.log.debug(f"Current model: {self.current_model}")
+            self.log.debug(f"Selected model ID: {selected_model if 'selected_model' in locals() else 'not selected yet'}")
             return None
 
     def _build_generation_prompt(self, techniques: str) -> str:
