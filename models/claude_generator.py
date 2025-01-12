@@ -30,50 +30,57 @@ class ClaudeGenerator:
     
     def _select_claude_model(self, model: str = None) -> str:
         """Get the appropriate Claude model to use"""
+        # If a specific model is requested, use it
         if model in self.model_ids:
             self.current_model = model
             return self.model_ids[model]
             
-        # Default to 3.5 sonnet if not specified (balanced choice)
+        # Default to 3.5 sonnet only if no model is specified
         self.current_model = 'claude-3.5-sonnet'
         return self.model_ids['claude-3.5-sonnet']
     
     def generate_with_ai(self, prompt: str) -> Optional[str]:
         """Generate code using Claude API with better error handling"""
         try:
+            # Select model if not already set
+            if not self.current_model:
+                self._select_claude_model()
+            
             # Build a focused creative prompt
             structured_prompt = self._build_generation_prompt(prompt)
             
             system_prompt = """You are a creative coder crafting generative art with Processing.
-Your task is to write ONLY the creative code that will be inserted into a template.
-DO NOT write setup() or draw() functions - these are handled by the template.
-DO NOT use translate(), background(), size(), or frameRate() - these are handled by the template.
+Express your artistic vision through code - feel free to experiment and innovate.
 
-The template provides:
-- Canvas setup (800x800)
-- Origin translation to center
-- Background clearing
-- Frame rate control
-- Progress variable (0.0 to 1.0)
+The template provides the framework (setup, draw, etc). You only need to write the creative code.
+Focus on creating interesting visuals and smooth animations using the progress variable (0.0 to 1.0).
 
-Focus on writing creative, expressive code that creates interesting visual elements.
-Use valid Processing syntax and complete all method calls and references."""
+Core requirements:
+- Define initSketch() for setup and runSketch(float progress) for animation
+- Don't include system functions (setup, draw, background, etc)
+- Use valid Processing syntax for your creative code
+
+Beyond these basics, you have complete creative freedom. Let your artistic vision guide you."""
             
             # Log the full prompt being sent
             self.log.debug(f"\n=== SENDING TO AI ===\nSystem: {system_prompt}\nUser: {structured_prompt}\n==================\n")
             
-            # Use the model that was selected
-            selected_model = self._select_claude_model(self.current_model)
-            self.log.debug(f"Using model ID: {selected_model} (from {self.current_model})")
+            # Get the model ID based on current_model
+            model_id = self.model_ids.get(self.current_model)
+            if not model_id:
+                self.log.error(f"Invalid model selected: {self.current_model}")
+                return None
+                
+            self.log.debug(f"Using model ID: {model_id} (from {self.current_model})")
             
             response = self.client.messages.create(
-                model=selected_model,
+                model=model_id,
                 max_tokens=4096,
                 messages=[
                     {"role": "user", "content": structured_prompt}
                 ],
                 system=system_prompt,
-                temperature=0.9,
+                temperature=0.8,
                 stop_sequences=["// END OF YOUR CREATIVE CODE"]
             )
             
@@ -161,7 +168,7 @@ Use valid Processing syntax and complete all method calls and references."""
         except Exception as e:
             self.log.error(f"AI generation error: {str(e)}")
             self.log.debug(f"Current model: {self.current_model}")
-            self.log.debug(f"Selected model ID: {selected_model if 'selected_model' in locals() else 'not selected yet'}")
+            self.log.debug(f"Selected model ID: {model_id if 'model_id' in locals() else 'not selected yet'}")
             return None
 
     def _build_generation_prompt(self, techniques: str) -> str:
@@ -328,33 +335,14 @@ Return your code between these markers:
             return code
 
     def validate_creative_code(self, code: str) -> tuple[bool, str]:
-        """Validate creative code for forbidden elements"""
+        """Basic validation to catch only critical issues"""
         if not code.strip():
             return False, "Empty code"
-        
-        # Only check for critical system-level functions that would break the sketch
-        critical_forbidden = {
-            'setup(': 'Contains setup()',
-            'draw(': 'Contains draw()',
-            'background(': 'Contains background()',
-            'size(': 'Contains size()',
-            'frameRate(': 'Contains frameRate()',
-        }
-        
-        # Check for critical forbidden elements
-        for term, error in critical_forbidden.items():
-            if term in code:
-                return False, error
-        
-        # Check for absolute translations that would re-center the origin
-        for line in code.split('\n'):
-            line = line.strip()
-            if any(x in line for x in [
-                'translate(width/2', 'translate( width/2', 'translate(width / 2',
-                'translate(height/2', 'translate( height/2', 'translate(height / 2'
-            ]):
-                return False, "Contains origin re-centering - coordinates are already centered"
-        
+            
+        # Only check for system functions that would break the template
+        if any(term in code for term in ['setup(', 'draw(', 'background(', 'size(', 'frameRate(']):
+            return False, "Contains system functions that conflict with template"
+            
         return True, None
 
     def validate_core_requirements(self, code: str) -> tuple[bool, str]:

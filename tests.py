@@ -73,10 +73,8 @@ class TestRunner:
             self.log.warning("Test mode stopped by user")
 
     def test_claude_models(self):
-        """Test Claude model generation"""
-        print("\n" + "=" * 80)
-        print("║ CLAUDE MODEL TEST MODE")
-        print("=" * 80 + "\n")
+        """Test Claude model code generation"""
+        self.log.title("CLAUDE MODEL TEST MODE")
         
         print("Available Claude Models:")
         print("1. Claude 3.5 Sonnet (Latest, Balanced)")
@@ -95,6 +93,9 @@ class TestRunner:
                     
                 self.log.info(f"Testing with {model}")
                 
+                # Force config to use claude model for testing
+                self.config.set_model_selection(model)
+                
                 # Get techniques using evolution system
                 techniques = self.evolution.select_techniques()
                 if not techniques:
@@ -105,37 +106,12 @@ class TestRunner:
                 technique_names = [str(t.name) for t in techniques]
                 self.log.info(f"Creative approach: {technique_names}")
                 
-                # Force config to use selected model
-                self.config.force_model = model
-                
                 # Generate new iteration using standard pipeline
                 next_version = self.config.get_next_version()
-                new_code = self.generator.generate_with_model(model, technique_names)
+                new_code = self.generator.generate_new_iteration(techniques, next_version)
                 
                 if not new_code:
                     self.log.error("Failed to generate code")
-                    continue
-                    
-                # Update template with correct render path
-                template_path = self.config.paths['template']
-                with open(template_path, 'r') as f:
-                    template = f.read()
-                
-                # Update render path in template
-                template = re.sub(
-                    r'String\s+renderPath\s*=\s*"renders/render_v\d+"',
-                    f'String renderPath = "renders/render_v{next_version}"',
-                    template
-                )
-                
-                with open(template_path, 'w') as f:
-                    f.write(template)
-                    
-                # Run the sketch to generate frames
-                render_path = Path(f"render_v{next_version}")
-                success, error = self.generator.run_sketch(render_path)
-                if not success:
-                    self.log.error(f"Failed to run sketch: {error}")
                     continue
                     
                 # Create pattern object
@@ -160,10 +136,9 @@ class TestRunner:
                              f"Complexity: {pattern.mathematical_complexity:.2f}")
                 
                 # Ask to continue
-                choice = input("\nGenerate another? (y/n): ")
-                if choice.lower() != 'y':
+                if input("\nPress Enter to generate another, or 'q' to quit: ").lower() == 'q':
                     break
-                    
+                
             except Exception as e:
                 self.log.error(f"Error in test mode: {str(e)}")
                 if self.log.debug_enabled:
@@ -172,7 +147,7 @@ class TestRunner:
                     
             finally:
                 # Reset model selection to random
-                self.config.force_model = None
+                self.config.set_model_selection('random')
 
     def _get_random_techniques(self, count: int = 1) -> List[str]:
         """Get random techniques for testing"""

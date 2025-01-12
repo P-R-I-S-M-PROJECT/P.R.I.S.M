@@ -66,6 +66,11 @@ class ProcessingGenerator:
             self.config.metadata['parameters']['generation']['ai_parameters']['last_used_model'] = self._current_model
             self.config.save_metadata()
             
+            # Get generator and set model
+            generator = self.ai_generators[self._current_model]
+            if hasattr(generator, '_select_claude_model'):
+                generator._select_claude_model(self._current_model)
+            
             # Get next version from config (which scans renders directory)
             next_version = self.config.get_next_version()
             code = self._attempt_code_generation(technique_names, next_version)
@@ -537,7 +542,9 @@ Return the code between the markers."""
         # Use the generator from ai_generators dictionary
         if model in self.ai_generators:
             generator = self.ai_generators[model]
-            # Each generator handles its own model selection
+            # Explicitly set the model on the generator instance
+            if hasattr(generator, 'current_model'):
+                generator.current_model = model
             return generator.generate_with_ai(technique_str)
         else:
             self.log.error(f"Unknown model: {model}")
