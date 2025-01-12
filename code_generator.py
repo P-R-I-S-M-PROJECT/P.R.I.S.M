@@ -73,13 +73,28 @@ class ProcessingGenerator:
             
             # Get next version from config (which scans renders directory)
             next_version = self.config.get_next_version()
-            code = self._attempt_code_generation(technique_names, next_version)
-            if code:
+            
+            # Try code generation with compilation feedback
+            for attempt in range(3):  # Max 3 attempts
+                code = self._attempt_code_generation(technique_names, next_version)
+                if not code:
+                    continue
+                    
                 # Save and test the code
                 self._save_code(code, next_version)
                 render_path = Path(f"render_v{next_version}")
-                if self.run_sketch(render_path):
+                success, error = self.run_sketch(render_path)
+                
+                if success:
                     return code
+                    
+                # If compilation failed, feed error back into generation
+                if error and "Error:" in error:
+                    error_msg = error.split("Error:")[1].strip()
+                    self.log.warning(f"Compilation error: {error_msg}")
+                    technique_names = f"{technique_names}\n\nPrevious attempt had a compilation error: {error_msg}\nPlease fix the code and ensure proper type handling."
+                else:
+                    break
             
             self.log.error("Failed to generate stable code")
             return None
@@ -414,7 +429,7 @@ void draw() {{
             code
         )
     
-    def run_sketch(self, render_path: Path) -> tuple[bool, str]:
+    def run_sketch(self, render_path: Path) -> tuple[bool, Optional[str]]:
         """Run Processing sketch and generate frames"""
         try:
             script_path = self.config.base_path / "scripts" / "run_sketches.ps1"
@@ -458,22 +473,33 @@ void draw() {{
                 timeout=360
             )
             
-            if result.returncode == 0 and "Video saved as:" in result.stdout:
-                self.log.success("Sketch execution and video generation successful")
-                self.log.info(result.stdout)
-                return True, "Success"
-            else:
-                # Improve error reporting
+            if result.returncode != 0:
                 error_msg = result.stderr.strip() if result.stderr else result.stdout.strip()
                 if not error_msg:
                     error_msg = "Unknown Processing execution error"
                 self.log.error(f"Sketch execution failed: {error_msg}")
                 return False, error_msg
             
+            # Check if frames were generated
+            frames_path = self.config.base_path / "renders" / str(render_path)
+            frame_files = list(frames_path.glob("frame-*.png"))
+            if not frame_files:
+                self.log.error(f"No frame files found in {frames_path}")
+                return False, "No frames were generated"
+            
+            # Check for video generation success
+            if "Video saved as:" in result.stdout:
+                self.log.success("Sketch execution and video generation successful")
+                self.log.info(result.stdout)
+                return True, None
+            
+            return True, None
+            
         except subprocess.TimeoutExpired:
             error_msg = "Sketch execution timed out after 6 minutes"
             self.log.error(error_msg)
             return False, error_msg
+            
         except Exception as e:
             error_msg = f"Error running sketch: {str(e)}"
             self.log.error(error_msg)

@@ -1,41 +1,54 @@
 // === USER'S CREATIVE CODE ===
-int numLines = 100;
-float lineSpacing, lineWeight, lineLength;
-float xFreq, yFreq, zFreq;
-float xAmp, yAmp;
-float zOffset, zInc;
+// Global variables
+float[] hues;
+int numCurves = 12;
+float sortThreshold = 0.3;
 
 void initSketch() {
-  lineSpacing = 15;
-  lineWeight = 2;
-  lineLength = 400;
+  // Initialize array of hue values
+  hues = new float[numCurves];
+  for (int i = 0; i < numCurves; i++) {
+    hues[i] = map(i, 0, numCurves, 0, 255);
+  }
   
-  xFreq = 0.017;
-  yFreq = 0.037;
-  zFreq = 0.067;
-  
-  xAmp = 120;
-  yAmp = 80;
-
-  zOffset = 0;
-  zInc = 0.03;
-  
-  strokeWeight(lineWeight);
+  strokeWeight(2);
+  noFill();
 }
 
 void runSketch(float progress) {
-  float angle = progress * TWO_PI;
+  // Create semi-transparent overlay for trail effect
+  fill(0, 25);
+  rect(-width/2, -height/2, width, height);
+  noFill();
   
-  for (int i = 0; i < numLines; i++) {
-    float z = i * lineSpacing + zOffset;
-    float x = xAmp * cos(z * xFreq + angle);  
-    float y = yAmp * sin(z * yFreq + angle);
+  // Draw multiple Lissajous curves with different frequencies
+  for (int i = 0; i < numCurves; i++) {
+    float phase = progress * TWO_PI + (float)i/numCurves * PI;
+    float freq1 = 3 + i * 0.5;
+    float freq2 = 2 + i * 0.3;
     
-    stroke(255 * (i%2), 200, 255 - z/2, 100);
-    line(x, -lineLength/2 + y, x, lineLength/2 + y);
+    // Calculate base color with shifting hue
+    float hue = (hues[i] + progress * 100) % 255;
+    color c = color(hue, 200, 255);
+    
+    // Draw main curve
+    beginShape();
+    for (float t = 0; t < TWO_PI; t += 0.02) {
+      float x = sin(t * freq1 + phase) * 300;
+      float y = sin(t * freq2) * 300;
+      
+      // Add vertical pixel sorting effect based on position
+      float sortOffset = 0;
+      if (abs(x/300) > sortThreshold) {
+        sortOffset = map(abs(x/300), sortThreshold, 1, 0, 50) * sin(progress * TWO_PI);
+      }
+      
+      // Adjust color based on sorting effect
+      stroke(red(c), green(c), blue(c), map(abs(x/300), 0, 1, 255, 100));
+      vertex(x, y + sortOffset);
+    }
+    endShape();
   }
-  
-  zOffset += zInc;
 }
 // END OF YOUR CREATIVE CODE
 
@@ -59,7 +72,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v2362";
+        String renderPath = "renders/render_v2359";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();
