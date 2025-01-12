@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 from models.openai_4o import OpenAI4OGenerator
 from models.openai_o1 import OpenAIO1Generator
+from models.claude_generator import ClaudeGenerator
 from models.data_models import Pattern, Technique
 from logger import ArtLogger
 from pattern_analyzer import PatternAnalyzer
@@ -27,7 +28,9 @@ class ProcessingGenerator:
         self.ai_generators = {
             'o1': OpenAIO1Generator(config, self.log),
             'o1-mini': OpenAIO1Generator(config, self.log),
-            '4o': OpenAI4OGenerator(config, self.log)
+            '4o': OpenAI4OGenerator(config, self.log),
+            'claude-3-opus': ClaudeGenerator(config, self.log),
+            'claude-3-sonnet': ClaudeGenerator(config, self.log)
         }
         self._current_model = None
     

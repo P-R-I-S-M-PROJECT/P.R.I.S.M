@@ -1,19 +1,19 @@
 // === USER'S CREATIVE CODE ===
 void runSketch(float progress) {
-  int numLines = 150;
-  float spiralAngle = progress * TWO_PI * 6; // Complete 6 full rotations
-  for (int i = 0; i < numLines; i++) {
-      float angleOffset = map(i, 0, numLines, 0, TWO_PI);
-      float radius = map(i, 0, numLines, 50, 300);
-      float x1 = radius * cos(angleOffset + spiralAngle);
-      float y1 = radius * sin(angleOffset + spiralAngle);
-      float x2 = (radius + 10 * sin(progress * TWO_PI)) * cos(angleOffset + spiralAngle + PI);
-      float y2 = (radius + 10 * sin(progress * TWO_PI)) * sin(angleOffset + spiralAngle + PI);
-      stroke(map(sin(angleOffset + spiralAngle), -1, 1, 100, 255), 
-             map(cos(angleOffset + spiralAngle), -1, 1, 100, 255), 
-             200);
-      strokeWeight(map(sin(angleOffset + spiralAngle), -1, 1, 1, 3));
-      line(x1, y1, x2, y2);
+  int numCircles = 50;
+  float maxRadius = 200;
+  float waveSpeed = TWO_PI * 3;
+  float rippleOffset = PI / 3;
+  for (int i = 0; i < numCircles; i++) {
+    float angle = map(i, 0, numCircles, 0, TWO_PI);
+    float x = cos(angle + progress * TWO_PI) * maxRadius;
+    float y = sin(angle + progress * TWO_PI) * maxRadius;
+    float ripple = sin(progress * waveSpeed + i * rippleOffset);
+    float radius = map(ripple, -1, 1, 5, maxRadius / 4);
+    stroke(255, 200 - (255 * progress));
+    strokeWeight(2);
+    noFill();
+    ellipse(x, y, radius, radius);
   }
 }
 
@@ -42,7 +42,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v2340";
+        String renderPath = "renders/render_v2342";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();

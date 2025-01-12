@@ -11,6 +11,7 @@ from pattern_evolution import PatternEvolution
 from cleanup import SystemCleaner
 from datetime import datetime
 from models import Pattern
+from tests import TestRunner
 import json
 from typing import Dict
 
@@ -28,6 +29,7 @@ class PRISM:
         self.docs = DocumentationManager(config, self.log)
         self.evolution = PatternEvolution(config, self.log)
         self.cleaner = SystemCleaner(config, self.log)
+        self.test_runner = TestRunner(config, self.generator, self.evolution, self.db)
         
         # Add npm installation tracking
         self._npm_installed = False
@@ -72,9 +74,10 @@ Top Technique Combinations:""")
             print("2. Cleanup System")
             print("3. Toggle Debug Mode")
             print("4. Test O1 Models")
-            print("5. Exit")
+            print("5. Test Claude Models")
+            print("6. Exit")
             
-            choice = input("\nEnter your choice (1-5): ")
+            choice = input("\nEnter your choice (1-6): ")
             
             if choice == "1":
                 self.run_continuous()
@@ -84,8 +87,10 @@ Top Technique Combinations:""")
                 self.log.set_debug(not self.log.debug_enabled)
                 self.log.info(f"Debug mode {'enabled' if self.log.debug_enabled else 'disabled'}")
             elif choice == "4":
-                self.test_o1_models()
+                self.test_runner.test_o1_models()
             elif choice == "5":
+                self.test_runner.test_claude_models()
+            elif choice == "6":
                 self.log.title("Exiting System")
                 break
             else:
@@ -218,63 +223,6 @@ Top Technique Combinations:""")
         except Exception as e:
             self.log.error(f"Error syncing video: {str(e)}")
             return False
-    
-    def test_o1_models(self):
-        """Test mode for O1 model generation"""
-        self.log.title("O1 MODEL TEST MODE")
-        try:
-            while True:
-                # Force config to use o1 model for testing
-                self.config.set_model_selection('o1')
-                
-                # Get creative direction
-                techniques = self.evolution.select_techniques()
-                if not techniques:
-                    self.log.error("Failed to select techniques")
-                    return
-                
-                # Convert numpy strings to regular strings for display and storage
-                technique_names = [str(t.name) for t in techniques]
-                self.log.info(f"Creative approach: {technique_names}")
-                
-                # Generate code and run sketch
-                next_version = self.config.get_next_version()
-                new_code = self.generator.generate_new_iteration(techniques, next_version)
-                if not new_code:
-                    self.log.error("Failed to generate code")
-                    return
-                
-                # Create and score pattern
-                pattern = Pattern(
-                    version=next_version,
-                    code=new_code,
-                    timestamp=datetime.now(),
-                    techniques=technique_names
-                )
-                
-                # Score pattern
-                scores = self.generator.score_pattern(pattern)
-                pattern.update_scores(scores)
-                
-                # Save pattern
-                self.db.save_pattern(pattern)
-                
-                # Display scores
-                self.log.pattern_score(pattern.score)
-                self.log.info(f"Innovation: {pattern.innovation_score:.2f}, "
-                             f"Aesthetic: {pattern.aesthetic_score:.2f}, "
-                             f"Complexity: {pattern.mathematical_complexity:.2f}")
-                
-                # Ask to continue
-                if input("\nPress Enter to generate another, or 'q' to quit: ").lower() == 'q':
-                    # Reset model selection to random before exiting
-                    self.config.set_model_selection('random')
-                    break
-                
-        except KeyboardInterrupt:
-            # Reset model selection to random on interrupt
-            self.config.set_model_selection('random')
-            self.log.warning("Test mode stopped by user")
     
     def _run_sketch(self, render_path: str, metadata: Dict = None) -> bool:
         """Run the Processing sketch"""

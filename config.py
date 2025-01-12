@@ -21,13 +21,15 @@ class Config:
         
         # Model configuration
         self.model_config = {
-            'available_models': ['o1', 'o1-mini', '4o'],
+            'available_models': ['o1', 'o1-mini', '4o', 'claude-3-opus', 'claude-3.5-sonnet'],
             'default_model': '4o',
             'model_selection': 'random',  # 'random' or specific model name
             'model_weights': {
-                '4o': 0.34,
-                'o1': 0.33,
-                'o1-mini': 0.33
+                '4o': 0.2,
+                'o1': 0.2,
+                'o1-mini': 0.2,
+                'claude-3-opus': 0.2,    # Best quality, slower
+                'claude-3.5-sonnet': 0.2  # Latest model, balanced performance
             }
         }
         
@@ -281,9 +283,15 @@ class Config:
     def _load_environment(self) -> Dict[str, str]:
         """Load required environment variables"""
         api_key = os.getenv('OPENAI_API_KEY')
+        claude_key = os.getenv('ANTHROPIC_API_KEY')
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable not found")
-        return {'OPENAI_API_KEY': api_key}
+        if not claude_key:
+            raise ValueError("ANTHROPIC_API_KEY environment variable not found")
+        return {
+            'OPENAI_API_KEY': api_key,
+            'ANTHROPIC_API_KEY': claude_key
+        }
     
     def get_model_config(self) -> Dict[str, Any]:
         """Get current model configuration"""

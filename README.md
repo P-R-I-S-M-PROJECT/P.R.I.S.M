@@ -4,7 +4,7 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
 
 ## Core Components
 
-- **Pattern Generation**: AI models generate Processing code for geometric animations
+- **Pattern Generation**: Multi-model AI generation (OpenAI & Anthropic) for geometric animations
 - **Evolution System**: Tracks technique performance and adapts generation strategy
 - **Analysis Pipeline**: Evaluates visual complexity, motion quality, and aesthetics
 - **Documentation**: Auto-generates insights about patterns and techniques
@@ -26,6 +26,7 @@ The project has specific structural requirements:
   ```
   auto/
   ├── data/           # Database and metadata storage
+  ├── models/         # AI model integrations
   ├── renders/        # Generated animations
   ├── scripts/        # Contains run_sketches.ps1 and ffmpeg.exe
   └── web/public/videos/  # Final video outputs
@@ -41,9 +42,10 @@ The project has specific structural requirements:
    npm install
    ```
 
-2. Create a `.env` file with your OpenAI API key:
+2. Create a `.env` file with your API keys:
    ```bash
-   echo "OPENAI_API_KEY=your_key_here" > .env
+   OPENAI_API_KEY=your_openai_key_here
+   ANTHROPIC_API_KEY=your_anthropic_key_here
    ```
 
 3. Run:
@@ -59,9 +61,11 @@ The project has specific structural requirements:
 ├── code_generator.py     # Pattern generation engine
 ├── pattern_analyzer.py   # Frame analysis system
 ├── pattern_evolution.py  # Technique evolution
+├── tests.py             # Model testing framework
 ├── models/              
-│   ├── openai_o1.py     # O1 model integration
-│   └── openai_4o.py     # 4O model integration
+│   ├── openai_o1.py     # O1 model - Primary generation
+│   ├── openai_4o.py     # 4O model - Basic generation
+│   └── claude_generator.py  # Claude integration
 ```
 
 ### Pipeline Overview
@@ -73,7 +77,12 @@ The project has specific structural requirements:
    - Synergy boosts for proven combinations
 
 2. **Code Generation**
-   - Model selection (o1: 33%, o1-mini: 33%, 4o: 34%)
+   - Model selection with equal weights (20% each):
+     - O1 (Superior reasoning and logic)
+     - O1-mini (Fast and efficient)
+     - 4O (Basic generation)
+     - Claude 3.5 Sonnet (Latest, balanced)
+     - Claude 3 Opus (Best quality)
    - Processing code generation
    - Structure validation
    - Error recovery
@@ -94,6 +103,22 @@ The project has specific structural requirements:
    - Synergy calculations
    - Technique adaptation
    - Pattern lineage tracking
+
+## Testing Framework
+
+The system includes dedicated test modes for different AI models:
+
+1. **O1 Test Mode**
+   - Test openai models in isolation
+   - Full pattern generation and scoring
+   - Performance tracking
+
+2. **Claude Test Mode**
+   - Choose between Claude 3.5 Sonnet and Claude 3 Opus
+   - Isolated testing for each model
+   - Full pattern generation and analysis
+
+Access test modes through the main menu (options 4 and 5).
 
 ## License
 
