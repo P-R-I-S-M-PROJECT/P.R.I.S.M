@@ -12,14 +12,10 @@ $sketchPath = Join-Path $projectRoot "auto.pde"
 $ffmpegPath = Join-Path $PSScriptRoot "ffmpeg.exe"
 $maxExecutionTime = 180  # 3 minutes timeout
 
-# Create renders directory and snapshots subdirectory if they don't exist
+# Create renders directory if it doesn't exist
 $rendersDir = Join-Path $projectRoot "renders"
-$snapshotsDir = Join-Path $rendersDir "snapshots"
 if (-not (Test-Path $rendersDir)) {
     New-Item -ItemType Directory -Path $rendersDir | Out-Null
-}
-if (-not (Test-Path $snapshotsDir)) {
-    New-Item -ItemType Directory -Path $snapshotsDir | Out-Null
 }
 
 # Modify RenderPath to be inside renders directory
