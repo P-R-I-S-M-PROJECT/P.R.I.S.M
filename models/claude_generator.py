@@ -44,7 +44,6 @@ class ClaudeGenerator:
             # Build a focused creative prompt
             structured_prompt = self._build_generation_prompt(prompt)
             
-            # Add system prompt for creative coding context
             system_prompt = """You are a creative coder crafting generative art with Processing.
 Your task is to write ONLY the creative code that will be inserted into a template.
 DO NOT write setup() or draw() functions - these are handled by the template.
@@ -57,8 +56,8 @@ The template provides:
 - Frame rate control
 - Progress variable (0.0 to 1.0)
 
-Focus on writing the actual creative code that will be inserted into the draw() function.
-Return ONLY the code that creates the visual elements."""
+Focus on writing creative, expressive code that creates interesting visual elements.
+Use valid Processing syntax and complete all method calls and references."""
             
             # Log the full prompt being sent
             self.log.debug(f"\n=== SENDING TO AI ===\nSystem: {system_prompt}\nUser: {structured_prompt}\n==================\n")
@@ -253,29 +252,13 @@ Return your code between these markers:
         return random.sample(techniques, count)
 
     def _clean_code(self, code: str) -> str:
-        """Clean and prepare user code, ensuring proper structure"""
+        """Clean and prepare user code, focusing only on essential formatting"""
         try:
-            # Remove any setup() or draw() functions
-            code = re.sub(r'void\s+setup\s*\(\s*\)\s*{[^}]*}', '', code)
-            code = re.sub(r'void\s+draw\s*\(\s*\)\s*{[^}]*}', '', code)
-            
-            # Remove any system calls that are handled by the framework
-            code = re.sub(r'\s*background\([^)]*\);', '', code)
-            code = re.sub(r'\s*size\([^)]*\);', '', code)
-            code = re.sub(r'\s*frameRate\([^)]*\);', '', code)
-            code = re.sub(r'\s*translate\(width/2[^)]*\);', '', code)
-            code = re.sub(r'\s*translate\(height/2[^)]*\);', '', code)
-            code = re.sub(r'\s*saveFrame\([^)]*\);', '', code)
-            code = re.sub(r'\s*exit\(\);', '', code)
-            
-            # Ensure class definitions are at top level
-            code = re.sub(r'(class\s+\w+\s*{[^}]*})\s*void', r'\1\n\nvoid', code)
-            
-            # Clean up empty lines and whitespace
-            code = re.sub(r'\n\s*\n\s*\n', '\n\n', code)
+            # Apply basic cleaning
+            code = self._remove_system_calls(code)
             code = code.strip()
             
-            # Ensure required functions exist with proper structure
+            # Ensure required functions exist
             if 'void initSketch()' not in code:
                 code += '\n\nvoid initSketch() {\n  // Initialize sketch\n}'
             if 'void runSketch(float progress)' not in code:
@@ -286,6 +269,23 @@ Return your code between these markers:
         except Exception as e:
             self.log.error(f"Error cleaning code: {e}")
             return code
+
+    def _remove_system_calls(self, code: str) -> str:
+        """Remove system calls that are handled by the framework"""
+        # Remove any setup() or draw() functions
+        code = re.sub(r'void\s+setup\s*\(\s*\)\s*{[^}]*}', '', code)
+        code = re.sub(r'void\s+draw\s*\(\s*\)\s*{[^}]*}', '', code)
+        
+        # Remove any system calls that are handled by the framework
+        code = re.sub(r'\s*background\([^)]*\);', '', code)
+        code = re.sub(r'\s*size\([^)]*\);', '', code)
+        code = re.sub(r'\s*frameRate\([^)]*\);', '', code)
+        code = re.sub(r'\s*translate\(width/2[^)]*\);', '', code)
+        code = re.sub(r'\s*translate\(height/2[^)]*\);', '', code)
+        code = re.sub(r'\s*saveFrame\([^)]*\);', '', code)
+        code = re.sub(r'\s*exit\(\);', '', code)
+        
+        return code
 
     def _extract_code_from_response(self, content: str) -> Optional[str]:
         """Extract and clean user code from AI response without template wrapping"""
@@ -332,19 +332,28 @@ Return your code between these markers:
         if not code.strip():
             return False, "Empty code"
         
-        # Check for critical forbidden elements
+        # Only check for critical system-level functions that would break the sketch
         critical_forbidden = {
             'setup(': 'Contains setup()',
             'draw(': 'Contains draw()',
             'background(': 'Contains background()',
             'size(': 'Contains size()',
             'frameRate(': 'Contains frameRate()',
-            'translate(width/2': 'Contains origin re-centering'
         }
         
+        # Check for critical forbidden elements
         for term, error in critical_forbidden.items():
             if term in code:
                 return False, error
+        
+        # Check for absolute translations that would re-center the origin
+        for line in code.split('\n'):
+            line = line.strip()
+            if any(x in line for x in [
+                'translate(width/2', 'translate( width/2', 'translate(width / 2',
+                'translate(height/2', 'translate( height/2', 'translate(height / 2'
+            ]):
+                return False, "Contains origin re-centering - coordinates are already centered"
         
         return True, None
 
