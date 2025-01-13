@@ -20,7 +20,6 @@ class SystemCleaner:
             self._cleanup_renders()
             self._cleanup_web_videos()
             self._reset_database()
-            self._reset_documentation()
             self._reset_metadata()
             
         except Exception as e:
@@ -63,14 +62,14 @@ class SystemCleaner:
                 self.log.error(f"Failed to archive {sketch_file.name}: {e}")
     
     def _cleanup_renders(self):
-        """Clear renders directory while preserving snapshots"""
+        """Clear renders directory while preserving snapshots and .gitkeep"""
         renders_path = self.config.base_path / "renders"
         if renders_path.exists():
             self.log.info("Clearing renders directory...")
             for item in renders_path.iterdir():
                 try:
-                    # Skip the snapshots directory
-                    if item.name == "snapshots":
+                    # Skip the snapshots directory and .gitkeep
+                    if item.name == "snapshots" or item.name == ".gitkeep":
                         continue
                         
                     if item.is_dir():
@@ -101,35 +100,6 @@ class SystemCleaner:
     def _reset_database(self):
         """Reset database to initial state"""
         self.db.init_db(force=True)
-    
-    def _reset_documentation(self):
-        """Reset documentation to initial state"""
-        history_template = """Most Recent Version: v0
-
-# Animation Experiment History (2024)
-
-## Current Version: v0
-**Focus:** Black background with mainly monochrome and white lines/shapes/elements/patterns for subtle layering and variation.
-
-## Version Entry Format
-Each version documents:
-- **Score**: Overall performance metrics
-- **Innovation**: Measure of creative approach
-- **Aesthetic**: Visual appeal assessment
-- **Complexity**: Implementation sophistication
-- **Techniques**: Applied creative methods
-
-## Historical Record
-
-### v0: Initial Setup
-- **Score**: 75.0
-- **Innovation**: 85.0
-- **Aesthetic**: 75.0
-- **Complexity**: 75.0
-- **Techniques**: Basic geometric framework
-"""
-        with open(self.config.paths['docs']['history'], 'w') as f:
-            f.write(history_template)
     
     def _reset_metadata(self):
         """Reset metadata to initial state"""
