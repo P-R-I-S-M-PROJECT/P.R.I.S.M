@@ -160,13 +160,20 @@ class ProcessingGenerator:
         last_error = None
         original_prompt = prompt
         
+        # Store the initially selected model
+        initial_model = self._current_model
+        
         for attempt in range(max_attempts):
             try:
                 self.log.debug(f"\n=== GENERATION ATTEMPT {attempt + 1} ===")
                 if last_error:
                     self.log.debug(f"Previous error: {last_error}")
                     
-                generator = self.ai_generators[self._current_model]
+                generator = self.ai_generators[initial_model]  # Use initial model consistently
+                # Ensure the generator keeps using the same model
+                if hasattr(generator, 'current_model'):
+                    generator.current_model = initial_model
+                    
                 if generated_code := self._try_single_generation(generator, prompt, attempt, version):
                     return generated_code
                     
