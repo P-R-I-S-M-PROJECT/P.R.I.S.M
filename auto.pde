@@ -1,53 +1,59 @@
 // === USER'S CREATIVE CODE ===
+class Rose {
+  float k;
+  float amplitude;
+  
+  Rose(float kValue, float amp) {
+    k = kValue;
+    amplitude = amp;
+  }
+
+void drawRose(float offset, float hueShift) {
+    // Use a small step for smooth curves
+    float step = 0.01;
+    // Set dynamic color shifted by progress
+    stroke(
+      (int)((150 + hueShift) % 255), 
+      (int)((100 + hueShift * 2) % 255), 
+      (int)((200 + hueShift * 3) % 255)
+    );
+    noFill();
+    beginShape();
+    for (float a = 0; a < TWO_PI; a += step) {
+      float r = amplitude * cos(k * (a + offset));
+      float x = r * cos(a + offset);
+      float y = r * sin(a + offset);
+      vertex(x, y);
+    }
+    endShape(CLOSE);
+  }
+}
+
 // Global variables
-float[] hues;
-int numCurves = 12;
-float sortThreshold = 0.3;
+Rose[] roses;
+float phi = (1 + sqrt(5)) / 2.0; // Golden ratio
 
 void initSketch() {
-  // Initialize array of hue values
-  hues = new float[numCurves];
-  for (int i = 0; i < numCurves; i++) {
-    hues[i] = map(i, 0, numCurves, 0, 255);
-  }
+  // Create an array of Rose objects with different k values
+  roses = new Rose[5];
   
-  strokeWeight(2);
-  noFill();
+  // Spread amplitude using some golden ratio offsets
+  for (int i = 0; i < roses.length; i++) {
+    float kVal = 2 + i; 
+    float amp = 100 + i * 30 * phi;
+    roses[i] = new Rose(kVal, amp);
+  }
 }
 
 void runSketch(float progress) {
-  // Create semi-transparent overlay for trail effect
-  fill(0, 25);
-  rect(-width/2, -height/2, width, height);
-  noFill();
+  // progress goes from 0.0 to 1.0 over 6 seconds
+  // Use it to create a looping angle and color offset
+  float angleOffset = progress * TWO_PI;
+  float colorShift  = progress * 255;
   
-  // Draw multiple Lissajous curves with different frequencies
-  for (int i = 0; i < numCurves; i++) {
-    float phase = progress * TWO_PI + (float)i/numCurves * PI;
-    float freq1 = 3 + i * 0.5;
-    float freq2 = 2 + i * 0.3;
-    
-    // Calculate base color with shifting hue
-    float hue = (hues[i] + progress * 100) % 255;
-    color c = color(hue, 200, 255);
-    
-    // Draw main curve
-    beginShape();
-    for (float t = 0; t < TWO_PI; t += 0.02) {
-      float x = sin(t * freq1 + phase) * 300;
-      float y = sin(t * freq2) * 300;
-      
-      // Add vertical pixel sorting effect based on position
-      float sortOffset = 0;
-      if (abs(x/300) > sortThreshold) {
-        sortOffset = map(abs(x/300), sortThreshold, 1, 0, 50) * sin(progress * TWO_PI);
-      }
-      
-      // Adjust color based on sorting effect
-      stroke(red(c), green(c), blue(c), map(abs(x/300), 0, 1, 255, 100));
-      vertex(x, y + sortOffset);
-    }
-    endShape();
+  // Draw each rose curve
+  for (int i = 0; i < roses.length; i++) {
+    roses[i].drawRose(angleOffset, colorShift + i * 40);
   }
 }
 // END OF YOUR CREATIVE CODE
@@ -72,7 +78,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v2359";
+        String renderPath = "renders/render_v90";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();

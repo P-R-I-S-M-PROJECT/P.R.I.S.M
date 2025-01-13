@@ -24,9 +24,9 @@ class OpenAIO1Generator:
             self.current_model = model
             return self.model_ids[model]
             
-        # Default to o1 if not specified
-        self.current_model = 'o1'
-        return self.model_ids['o1']
+        # Default to o1-mini if not specified
+        self.current_model = 'o1-mini'
+        return self.model_ids['o1-mini']
     
     def generate_with_ai(self, prompt: str) -> Optional[str]:
         """Generate code using OpenAI API with better error handling"""
