@@ -1,60 +1,23 @@
 // === USER'S CREATIVE CODE ===
-class Rose {
-  float k;
-  float amplitude;
-  
-  Rose(float kValue, float amp) {
-    k = kValue;
-    amplitude = amp;
-  }
-
-void drawRose(float offset, float hueShift) {
-    // Use a small step for smooth curves
-    float step = 0.01;
-    // Set dynamic color shifted by progress
-    stroke(
-      (int)((150 + hueShift) % 255), 
-      (int)((100 + hueShift * 2) % 255), 
-      (int)((200 + hueShift * 3) % 255)
-    );
-    noFill();
-    beginShape();
-    for (float a = 0; a < TWO_PI; a += step) {
-      float r = amplitude * cos(k * (a + offset));
-      float x = r * cos(a + offset);
-      float y = r * sin(a + offset);
-      vertex(x, y);
-    }
-    endShape(CLOSE);
+void runSketch(float progress) {
+  float radius = 300;
+  int numPoints = 200;
+  float angleStep = TWO_PI / numPoints;
+  for (int i = 0; i < numPoints; i++) {
+      float angle = i * angleStep;
+      float x = radius * cos(angle);
+      float y = radius * sin(angle);
+      float mappedAngle = map(progress, 0, 1, 0, TWO_PI * 2);
+      float targetAngle = i * angleStep * 2 + mappedAngle;
+      float targetX = radius * cos(targetAngle);
+      float targetY = radius * sin(targetAngle);
+      stroke(255, 100, 150);
+      line(x, y, targetX, targetY);
   }
 }
-
-// Global variables
-Rose[] roses;
-float phi = (1 + sqrt(5)) / 2.0; // Golden ratio
 
 void initSketch() {
-  // Create an array of Rose objects with different k values
-  roses = new Rose[5];
-  
-  // Spread amplitude using some golden ratio offsets
-  for (int i = 0; i < roses.length; i++) {
-    float kVal = 2 + i; 
-    float amp = 100 + i * 30 * phi;
-    roses[i] = new Rose(kVal, amp);
-  }
-}
-
-void runSketch(float progress) {
-  // progress goes from 0.0 to 1.0 over 6 seconds
-  // Use it to create a looping angle and color offset
-  float angleOffset = progress * TWO_PI;
-  float colorShift  = progress * 255;
-  
-  // Draw each rose curve
-  for (int i = 0; i < roses.length; i++) {
-    roses[i].drawRose(angleOffset, colorShift + i * 40);
-  }
+  // Initialize sketch
 }
 // END OF YOUR CREATIVE CODE
 
@@ -78,7 +41,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v90";
+        String renderPath = "renders/render_v357";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();
