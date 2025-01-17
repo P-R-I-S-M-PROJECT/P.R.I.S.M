@@ -181,36 +181,22 @@ class DocumentationManager:
         conn = self.db.get_connection()
         cursor = conn.cursor()
         
-        # Convert dictionary values to JSON strings if needed
-        technical_analysis = (
-            json.dumps(analysis.get('technical_analysis'))
-            if isinstance(analysis.get('technical_analysis'), dict)
-            else str(analysis.get('technical_analysis', ''))
-        )
+        def serialize_value(value):
+            """Helper to serialize any value to a string"""
+            if isinstance(value, dict):
+                return json.dumps(value)
+            elif value is None:
+                return ''
+            else:
+                return str(value)
         
-        technical_insights = (
-            json.dumps(analysis.get('technical_insights'))
-            if isinstance(analysis.get('technical_insights'), dict)
-            else str(analysis.get('technical_insights', ''))
-        )
-        
-        aesthetic_analysis = (
-            json.dumps(analysis.get('aesthetic_analysis'))
-            if isinstance(analysis.get('aesthetic_analysis'), dict)
-            else str(analysis.get('aesthetic_analysis', ''))
-        )
-        
-        evolution_analysis = (
-            json.dumps(analysis.get('evolution_analysis'))
-            if isinstance(analysis.get('evolution_analysis'), dict)
-            else str(analysis.get('evolution_analysis', ''))
-        )
-        
-        technique_insights = (
-            json.dumps(analysis.get('technique_insights'))
-            if isinstance(analysis.get('technique_insights'), dict)
-            else str(analysis.get('technique_insights', ''))
-        )
+        # Convert all values to properly serialized strings
+        technical_analysis = serialize_value(analysis.get('technical_analysis'))
+        technical_insights = serialize_value(analysis.get('technical_insights'))
+        aesthetic_analysis = serialize_value(analysis.get('aesthetic_analysis'))
+        evolution_analysis = serialize_value(analysis.get('evolution_analysis'))
+        technique_insights = serialize_value(analysis.get('technique_insights'))
+        tags = json.dumps(analysis.get('tags', []))
         
         cursor.execute("""
             INSERT INTO pattern_analysis (
@@ -226,7 +212,7 @@ class DocumentationManager:
             aesthetic_analysis,
             evolution_analysis,
             technique_insights,
-            json.dumps(analysis.get('tags', []))
+            tags
         ))
         conn.commit()
         conn.close()
