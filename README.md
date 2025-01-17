@@ -1,6 +1,6 @@
 # PRISM - Pattern Recognition & Interactive Sketch Machine
 
-PRISM is an AI-driven creative system that generates sophisticated geometric animations using Processing. It functions as an automated art studio with evolutionary memory, treating each creation as a data point in a living system.
+PRISM is an AI-driven creative system that generates sophisticated geometric animations using Processing. It functions as an interactive art studio with evolutionary memory, treating each creation as a data point in a living system.
 
 ## Core Components
 
@@ -13,23 +13,22 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
 
 - Python 3.8+
 - Processing 4.0+ (must be installed at "C:\Program Files\processing-4.3\processing-java.exe")
-- Node.js 16+
 - PowerShell 7+ (Windows)
 - FFmpeg (included in scripts/ffmpeg.exe)
 
 ## Important Structure
 
 The project has specific structural requirements:
-- Main sketch must be named `auto.pde`
-- Project folder must be named `auto`
+- Main sketch must be named `prism.pde`
+- Project folder must be named `prism`
 - Required directories:
   ```
-  auto/
+  prism/
   ├── data/           # Database and metadata storage
   ├── models/         # AI model integrations
-  ├── renders/        # Generated animations
-  ├── scripts/        # Contains run_sketches.ps1 and ffmpeg.exe
-  └── web/public/videos/  # Final video outputs
+  ├── renders/        # Generated animations and metadata
+  │   └── snapshots/  # Archived sketch files
+  └── scripts/        # Contains run_sketches.ps1 and ffmpeg.exe
   ```
 
 ## Quick Start
@@ -39,7 +38,6 @@ The project has specific structural requirements:
    git clone https://github.com/P-R-I-S-M-PROJECT/P.R.I.S.M.git
    cd P.R.I.S.M
    pip install -r requirements.txt
-   npm install
    ```
 
 2. Create a `.env` file with your API keys:
@@ -52,6 +50,30 @@ The project has specific structural requirements:
    ```bash
    python prism.py
    ```
+
+## Interactive Menu System
+
+PRISM provides an interactive menu system with the following options:
+
+1. **Generate Patterns**
+   - Single Pattern Generation
+   - Multiple Pattern Generation
+   - Continuous Generation (with custom interval)
+   - Model Selection
+
+2. **Model Selection**
+   - Random
+   - O1
+   - O1-mini
+   - 4O
+   - Claude 3.5 Sonnet
+   - Claude 3 Opus
+
+3. **System Tools**
+   - Cleanup System
+   - Toggle Debug Mode
+   - Test O1 Models
+   - Test Claude Models
 
 ## System Architecture
 
@@ -77,12 +99,7 @@ The project has specific structural requirements:
    - Synergy boosts for proven combinations
 
 2. **Code Generation**
-   - Model selection with equal weights (20% each):
-     - O1 (Superior reasoning and logic)
-     - O1-mini (Fast and efficient)
-     - 4O (Basic generation)
-     - Claude 3.5 Sonnet (Latest, balanced)
-     - Claude 3 Opus (Best quality)
+   - Model selection with equal weights (20% each)
    - Processing code generation
    - Structure validation
    - Error recovery
@@ -117,8 +134,6 @@ The system includes dedicated test modes for different AI models:
    - Choose between Claude 3.5 Sonnet and Claude 3 Opus
    - Isolated testing for each model
    - Full pattern generation and analysis
-
-Access test modes through the main menu (options 4 and 5).
 
 ## License
 

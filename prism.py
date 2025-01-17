@@ -72,7 +72,7 @@ Top Technique Combinations:""")
         while True:
             self.log.title("PRISM GENERATION SYSTEM")
             print("\nOptions:")
-            print("1. Run Continuous Generation")
+            print("1. Generate Patterns")
             print("2. Cleanup System")
             print("3. Toggle Debug Mode")
             print("4. Test O1 Models")
@@ -82,7 +82,7 @@ Top Technique Combinations:""")
             choice = input("\nEnter your choice (1-6): ")
             
             if choice == "1":
-                self.run_continuous()
+                self._show_generation_menu()
             elif choice == "2":
                 self.cleanup_system()
             elif choice == "3":
@@ -97,13 +97,96 @@ Top Technique Combinations:""")
             else:
                 print("\nInvalid choice. Please try again.")
     
-    def run_continuous(self):
-        """Main loop for continuous generation"""
-        self.log.info("Starting continuous automation...")
+    def _show_generation_menu(self):
+        """Show generation options menu"""
+        while True:
+            self.log.title("PATTERN GENERATION OPTIONS")
+            print("\nGeneration Mode:")
+            print("1. Single Pattern")
+            print("2. Multiple Patterns")
+            print("3. Continuous Generation")
+            print("4. Select Model")
+            print("5. Back to Main Menu")
+            
+            current_model = self.config.model_config['model_selection']
+            print(f"\nCurrent Model: {current_model}")
+            
+            choice = input("\nEnter your choice (1-5): ")
+            
+            if choice == "1":
+                self.run_iteration()
+                input("\nPress Enter to continue...")
+            elif choice == "2":
+                try:
+                    count = int(input("How many patterns to generate? "))
+                    if count > 0:
+                        for i in range(count):
+                            self.log.info(f"\nGenerating pattern {i+1} of {count}")
+                            self.run_iteration()
+                        input("\nGeneration complete. Press Enter to continue...")
+                except ValueError:
+                    print("Please enter a valid number")
+            elif choice == "3":
+                try:
+                    interval = int(input("Enter interval between generations in seconds (min 60): "))
+                    if interval < 60:
+                        print("Interval must be at least 60 seconds")
+                        continue
+                    self.run_continuous(interval)
+                except ValueError:
+                    print("Please enter a valid number")
+            elif choice == "4":
+                self._show_model_selection_menu()
+            elif choice == "5":
+                break
+            else:
+                print("\nInvalid choice. Please try again.")
+    
+    def _show_model_selection_menu(self):
+        """Show model selection menu"""
+        while True:
+            self.log.title("MODEL SELECTION")
+            print("\nAvailable Models:")
+            print("1. Random")
+            print("2. O1")
+            print("3. O1-mini")
+            print("4. 4O")
+            print("5. Claude 3.5 Sonnet")
+            print("6. Claude 3 Opus")
+            print("7. Back to Generation Menu")
+            
+            current_model = self.config.model_config['model_selection']
+            print(f"\nCurrent Model: {current_model}")
+            
+            choice = input("\nEnter your choice (1-7): ")
+            
+            model_map = {
+                "1": "random",
+                "2": "o1",
+                "3": "o1-mini",
+                "4": "4o",
+                "5": "claude-3.5-sonnet",
+                "6": "claude-3-opus"
+            }
+            
+            if choice in model_map:
+                self.config.set_model_selection(model_map[choice])
+                print(f"\nModel set to: {model_map[choice]}")
+                input("Press Enter to continue...")
+                return True  # Return to generation menu
+            elif choice == "7":
+                return True  # Return to generation menu
+            else:
+                print("\nInvalid choice. Please try again.")
+    
+    def run_continuous(self, interval: int = 600):
+        """Run continuous generation with specified interval"""
+        self.log.info(f"Starting continuous automation (interval: {interval}s)...")
         try:
             while True:
                 self.run_iteration()
-                time.sleep(600)
+                self.log.info(f"Waiting {interval} seconds until next generation...")
+                time.sleep(interval)
         except KeyboardInterrupt:
             self.log.warning("Stopping automation...")
     
@@ -155,9 +238,6 @@ Top Technique Combinations:""")
             
             # Update documentation
             self.docs.update(pattern)
-            
-            # Sync to server
-            self._sync_to_server()
             
         except Exception as e:
             self.log.error(f"Error in iteration: {e}")
@@ -236,6 +316,7 @@ Top Technique Combinations:""")
                 "powershell.exe",
                 "-ExecutionPolicy", "Bypass",
                 "-File", str(script_path),
+                "-SketchName", "prism",
                 "-RenderPath", str(render_path),
                 "-Metadata", metadata_str
             ]
@@ -252,31 +333,6 @@ Top Technique Combinations:""")
         except Exception as e:
             self.log.error(f"Error running sketch: {e}")
             return False
-    
-    def _sync_videos(self):
-        """Sync videos to CDN"""
-        try:
-            self.log.info("Syncing video to server...")
-            result = subprocess.run(
-                ['node', 'web/scripts/sync-videos.ts'],
-                capture_output=True,
-                text=True
-            )
-            
-            # Only pass the relevant output to the logger
-            if result.returncode == 0:
-                # Extract just the CDN verification part
-                output_lines = result.stdout.split('\n')
-                cdn_info = '\n'.join(line for line in output_lines 
-                                   if 'CDN response' in line 
-                                   or 'verification successful' in line
-                                   or 'animation_v' in line)
-                self.log.video_sync_complete(cdn_info)
-            else:
-                self.log.error(f"Video sync failed: {result.stderr}")
-                
-        except Exception as e:
-            self.log.error(f"Error syncing videos: {e}")
     
     def toggle_debug_mode(self):
         """Toggle debug mode and update all components"""

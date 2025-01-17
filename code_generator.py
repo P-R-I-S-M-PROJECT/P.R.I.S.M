@@ -382,17 +382,17 @@ Please fix these issues and return the corrected code."""
     
     # === File Operations ===
     def _save_code(self, code: str, version: int) -> None:
-        """Save generated code to auto.pde"""
+        """Save generated code to prism.pde"""
         try:
             # Update render path with version
             code = self._update_render_path(code, version)
             
-            # Save to auto.pde
+            # Save to prism.pde
             template_path = self.config.paths['template']
             with open(template_path, 'w') as f:
                 f.write(code)
             
-            # Verify auto.pde was saved
+            # Verify prism.pde was saved
             if not template_path.exists():
                 self.log.error(f"Failed to save {template_path}")
                 return

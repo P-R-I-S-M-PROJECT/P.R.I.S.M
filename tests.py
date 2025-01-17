@@ -164,7 +164,7 @@ class TestRunner:
             # Get paths
             render_path = self.config.base_path / "renders" / f"render_v{version}"
             sketch_path = render_path / "sketch.pde"
-            template_path = self.config.base_path / "auto.pde"
+            template_path = self.config.base_path / "prism.pde"
             
             # Read template and sketch code
             with open(template_path, 'r') as f:

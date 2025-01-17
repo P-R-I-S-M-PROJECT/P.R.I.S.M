@@ -8,7 +8,7 @@ param(
 # Configuration
 $processingPath = "C:\Program Files\processing-4.3\processing-java.exe"
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$sketchPath = Join-Path $projectRoot "auto.pde"
+$sketchPath = Join-Path $projectRoot "prism.pde"
 $ffmpegPath = Join-Path $PSScriptRoot "ffmpeg.exe"
 $maxExecutionTime = 180  # 3 minutes timeout
 
@@ -33,7 +33,7 @@ if (-not (Test-Path $RenderPath)) {
     New-Item -ItemType Directory -Path $RenderPath | Out-Null
 }
 
-# Copy auto.pde to render directory
+# Copy prism.pde to render directory
 $sketchCopy = Join-Path $RenderPath "render_v$renderVersion.pde"
 try {
     if (-not (Test-Path $sketchPath)) {
@@ -54,12 +54,6 @@ try {
 Write-Host "Starting with RenderPath: $RenderPath"
 Write-Host "Using sketch path: $sketchPath"
 
-# Create web videos directory
-$webVideosDir = Join-Path $projectRoot "web\public\videos"
-if (-not (Test-Path $webVideosDir)) {
-    New-Item -ItemType Directory -Path $webVideosDir -Force | Out-Null
-}
-
 # Kill any existing Processing instances first
 Get-Process | Where-Object { $_.ProcessName -like "*processing-java*" -or $_.ProcessName -like "*java*" } | 
     ForEach-Object {
@@ -75,7 +69,7 @@ Get-Process | Where-Object { $_.ProcessName -like "*processing-java*" -or $_.Pro
 Start-Sleep -Seconds 2
 
 try {
-    Write-Host "Running Processing sketch from auto.pde"
+    Write-Host "Running Processing sketch from prism.pde"
     
     $processStartInfo = New-Object System.Diagnostics.ProcessStartInfo
     $processStartInfo.FileName = $processingPath
@@ -174,10 +168,10 @@ try {
         $outputFile = Join-Path $RenderPath "output.mp4"
         $version = $RenderPath -replace '.*_v(\d+)$','$1'
         $timestamp = [int64](Get-Date -UFormat %s) * 1000
-        $finalFile = Join-Path $webVideosDir "animation_v$version-$timestamp.mp4"
+        $finalFile = Join-Path $RenderPath "animation_v$version-$timestamp.mp4"
         
         # Create metadata file
-        $metadataFile = Join-Path $webVideosDir "animation_v$version-$timestamp.json"
+        $metadataFile = Join-Path $RenderPath "animation_v$version-$timestamp.json"
         $Metadata | Out-File -FilePath $metadataFile -Encoding UTF8
         
         & $ffmpegPath -framerate 60 -i "$RenderPath\frame-%04d.png" -c:v libx264 -pix_fmt yuv420p -crf 17 $outputFile

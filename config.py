@@ -64,7 +64,7 @@ class Config:
     def _verify_required_files(self):
         """Verify all required files exist"""
         required_files = [
-            self.base_path / "auto.pde",
+            self.base_path / "prism.pde",
             self.base_path / "scripts" / "run_sketches.ps1",
             self.base_path / "scripts" / "ffmpeg.exe"
         ]
@@ -100,7 +100,7 @@ class Config:
     def paths(self) -> Dict[str, Path]:
         """Get important file paths"""
         return {
-            'template': self.base_path / "auto.pde",
+            'template': self.base_path / "prism.pde",
         }
     
     def initialize_metadata(self):

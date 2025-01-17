@@ -4,20 +4,42 @@
 
 PRISM is built on a multi-model AI architecture that leverages both OpenAI and Anthropic models for creative code generation. The system employs an evolutionary approach to pattern generation, continuously learning from past successes and failures.
 
+## Interactive System
+
+The system provides a comprehensive menu-driven interface:
+
+1. **Pattern Generation**
+   - Single pattern generation with immediate feedback
+   - Batch generation of multiple patterns
+   - Continuous generation with custom intervals
+   - Direct model selection for targeted experiments
+
+2. **Model Selection**
+   - Random mode with equal model weights
+   - Direct model selection for focused testing
+   - Seamless switching between models
+   - Model-specific performance tracking
+
+3. **System Management**
+   - Pattern cleanup and archival
+   - Debug mode for detailed logging
+   - Dedicated model testing modes
+   - Performance metrics and statistics
+
 ## AI Models
 
 The system integrates multiple AI models with different strengths:
 
 1. **OpenAI Models**
-   - O1: Superior reasoning and logic, best overall performance
-   - O1-mini: Fast and efficient, strong performance for most patterns
-   - 4O: Basic pattern generation, limited reasoning capabilities
+   - O1
+   - O1-mini
+   - 4O
 
 2. **Anthropic Models**
-   - Claude 3.5 Sonnet: Latest model, balanced performance
-   - Claude 3 Opus: Highest quality, best for complex patterns
+   - Claude 3.5 Sonnet
+   - Claude 3 Opus
 
-Each model is weighted equally (20%) in the selection process, ensuring diverse pattern generation.
+Each model is weighted equally (20%) in random selection mode.
 
 ## Generation Pipeline
 
@@ -28,9 +50,9 @@ Each model is weighted equally (20%) in the selection process, ensuring diverse 
    - Calculates synergy between techniques
 
 2. **Model Selection**
-   - Random selection based on configured weights
-   - Each model has equal probability (20%)
-   - Models can be tested individually using test modes
+   - User-selected or random based on configuration
+   - Each model has equal probability in random mode
+   - Models can be tested individually
 
 3. **Code Generation**
    - Selected model generates Processing code
@@ -39,10 +61,10 @@ Each model is weighted equally (20%) in the selection process, ensuring diverse 
    - Error recovery mechanisms in place
 
 4. **Rendering**
-   - Processing sketch compilation
+   - Processing sketch compilation (`prism.pde`)
    - 360-frame animation @ 60fps
    - FFmpeg video conversion
-   - CDN upload for web display
+   - Local storage with metadata
 
 ## Analysis System
 

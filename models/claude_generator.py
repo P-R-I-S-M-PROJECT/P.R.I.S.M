@@ -120,9 +120,9 @@ Beyond these basics, you have complete creative freedom. Let your artistic visio
                 self.log.debug("\n=== VALIDATION ERROR ===\nFailed final safety check\n==================\n")
                 return None
                 
-            # Save ONLY the creative code to auto.pde
-            auto_pde = self.config.base_path / "auto.pde"
-            with open(auto_pde, 'r') as f:
+            # Save ONLY the creative code to prism.pde
+            prism_pde = self.config.base_path / "prism.pde"
+            with open(prism_pde, 'r') as f:
                 template = f.read()
             
             # Update render path in template
@@ -133,7 +133,7 @@ Beyond these basics, you have complete creative freedom. Let your artistic visio
                 template
             )
             
-            # Insert between markers - note the exact marker text from auto.pde
+            # Insert between markers - note the exact marker text from prism.pde
             start_marker = "// === USER'S CREATIVE CODE ==="
             end_marker = "// === SYSTEM FRAMEWORK ==="
             
@@ -159,10 +159,10 @@ Beyond these basics, you have complete creative freedom. Let your artistic visio
                 after_marker
             )
             
-            with open(auto_pde, 'w') as f:
+            with open(prism_pde, 'w') as f:
                 f.write(full_code)
             
-            self.log.info(f"Code saved to {auto_pde}")
+            self.log.info(f"Code saved to {prism_pde}")
             return code
             
         except Exception as e:
@@ -437,8 +437,8 @@ Return your code between these markers:
         """Run a Processing sketch with the generated code"""
         try:
             # Read the template
-            auto_pde = self.config.base_path / "auto.pde"
-            with open(auto_pde, 'r') as f:
+            prism_pde = self.config.base_path / "prism.pde"
+            with open(prism_pde, 'r') as f:
                 template = f.read()
             
             # Update renderPath in template using regex
@@ -474,11 +474,11 @@ Return your code between these markers:
                 after_marker
             )
             
-            # Save to auto.pde
-            with open(auto_pde, 'w') as f:
+            # Save to prism.pde
+            with open(prism_pde, 'w') as f:
                 f.write(full_code)
             
-            self.log.info(f"Code saved to {auto_pde}")
+            self.log.info(f"Code saved to {prism_pde}")
             
             # Run the PowerShell script
             ps_script = self.config.base_path / "scripts" / "run_sketches.ps1"

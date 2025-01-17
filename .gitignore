@@ -53,8 +53,6 @@ temp/
 cache/
 web/**/*
 web/
-scripts/*
-!scripts/run_sketches.ps1
 
 # Windows
 Thumbs.db

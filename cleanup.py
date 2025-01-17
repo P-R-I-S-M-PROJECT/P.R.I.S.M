@@ -18,7 +18,6 @@ class SystemCleaner:
             # Archive sketches before cleanup
             self._archive_sketches()
             self._cleanup_renders()
-            self._cleanup_web_videos()
             self._reset_database()
             self._reset_metadata()
             
@@ -83,19 +82,6 @@ class SystemCleaner:
             # Create renders directory if it doesn't exist
             renders_path.mkdir(exist_ok=True)
             self.log.info("Created renders directory")
-    
-    def _cleanup_web_videos(self):
-        """Clear web videos directory including metadata files"""
-        web_videos_path = self.config.base_path / "web" / "public" / "videos"
-        if web_videos_path.exists():
-            # Clean both video and metadata files
-            for file in web_videos_path.glob("*"):
-                if file.suffix in ['.mp4', '.json']:  # Clean both video and metadata files
-                    try:
-                        file.unlink()
-                        self.log.success(f"Removed {file.name}")
-                    except Exception as e:
-                        self.log.error(f"Failed to remove {file.name}: {e}")
     
     def _reset_database(self):
         """Reset database to initial state"""
