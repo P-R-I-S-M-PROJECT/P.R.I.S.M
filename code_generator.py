@@ -96,17 +96,17 @@ class ProcessingGenerator:
                     else:
                         self.log.warning(f"No frames generated on attempt {attempt + 1}, retrying...")
                         if error:
-                            technique_names = f"{technique_names}\n\nPrevious attempt failed to generate frames. Error: {error}\nPlease ensure the code generates visible output."
+                            technique_names = f"{technique_names}\n\nPrevious attempt failed to generate frames. Error: {error}\nPlease ensure the code generates visible output.\nRemember: DO NOT include any system functions (setup, draw, etc). Focus on the creative code only."
                             continue
                 
                 # If compilation failed, feed error back into generation
                 if error and "Error:" in error:
                     error_msg = error.split("Error:")[1].strip()
                     self.log.warning(f"Compilation error on attempt {attempt + 1}: {error_msg}")
-                    technique_names = f"{technique_names}\n\nPrevious attempt had a compilation error: {error_msg}\nPlease fix the code and ensure proper type handling."
+                    technique_names = f"{technique_names}\n\nPrevious attempt had a compilation error: {error_msg}\nPlease fix the code and ensure proper type handling.\nRemember: DO NOT include any system functions (setup, draw, etc). Focus on the creative code only."
                 else:
                     self.log.warning(f"Unknown error on attempt {attempt + 1}, retrying...")
-                    technique_names = f"{technique_names}\n\nPrevious attempt failed. Please simplify the code and ensure it generates visible output."
+                    technique_names = f"{technique_names}\n\nPrevious attempt failed. Please simplify the code and ensure it generates visible output.\nRemember: DO NOT include any system functions (setup, draw, etc). Focus on the creative code only."
             
             self.log.error("Failed to generate stable code after all attempts")
             return None

@@ -405,11 +405,15 @@ class PatternAnalyzer:
             
             # Calculate average frame for current pattern
             current_avg = np.mean([frame.astype(float) for frame in frames], axis=0)
+            current_shape = current_avg.shape
             
             # Calculate difference from historical patterns
             differences = []
             for hist_frames in historical_patterns:
                 hist_avg = np.mean([frame.astype(float) for frame in hist_frames], axis=0)
+                # Resize historical frame to match current dimensions if different
+                if hist_avg.shape != current_shape:
+                    hist_avg = cv2.resize(hist_avg, (current_shape[1], current_shape[0]))
                 diff = np.mean(np.abs(current_avg - hist_avg)) / 255.0
                 differences.append(diff)
             

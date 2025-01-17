@@ -1,37 +1,80 @@
 // === USER'S CREATIVE CODE ===
-int numPoints = 400;
-float a = 200;
-float b = 50;
+class LSystem {
+  String axiom;
+  String rule;
+  String current;
+  
+  LSystem(String axiom_, String rule_) {
+    axiom = axiom_;
+    rule = rule_;
+    current = axiom;
+  }
+
+void generate() {
+    StringBuilder next = new StringBuilder();
+    for (int i = 0; i < current.length(); i++) {
+      char c = current.charAt(i);
+      if (c == 'F') {
+        next.append(rule);
+      } else {
+        next.append(c);
+      }
+    }
+    current = next.toString();
+  }
+  
+  String getString() {
+    return current;
+  }
+}
+
+// Global variables
+LSystem ls;
+float angleDeg = 60; // angle to turn (degrees)
+String fractalPath;
+float length = 6; // length of each "F" segment
 
 void initSketch() {
-  stroke(255);
-  strokeWeight(2);
-  noFill();
+  // Initialize the L-System
+  ls = new LSystem("F++F++F++F", "F-F++F-F");
+  
+  // Generate a few iterations
+  int iterations = 3;
+  for (int i = 0; i < iterations; i++) {
+    ls.generate();
+  }
+  fractalPath = ls.getString();
 }
 
 void runSketch(float progress) {
-  float t = progress * TWO_PI;
-  float k = b / a;
+  // Smooth rotation from 0 -> TWO_PI -> 0, over 0.0 to 1.0
+  float rotationAmount = progress * TWO_PI;
+  rotate(rotationAmount);
   
-  beginShape();
-  for (int i = 0; i < numPoints; i++) {
-    float angle = map(i, 0, numPoints, 0, TWO_PI);
-    float x = (a-b) * cos(angle) + b * cos((a-b)/b * angle);
-    float y = (a-b) * sin(angle) - b * sin((a-b)/b * angle);
-    
-    float r = map(sin(t*3 + angle*8), -1, 1, 100, 255);
-    float g = map(cos(t*2 + angle*4), -1, 1, 100, 255);
-    float b = map(sin(t + angle*12), -1, 1, 100, 255);
-    stroke(r, g, b);
-    
-    vertex(x * (1 + 0.2*sin(t)), y * (1 + 0.2*cos(t)));
+  // Vary color smoothly over time
+  float r = lerp(50, 255, progress);
+  float g = lerp(200, 100, progress);
+  float b = lerp(180, 255, 1 - progress);
+  stroke(r, g, b, 180);
+  strokeWeight(1);
+  noFill();
+  
+  // Parse the L-System string and draw
+  float angleRad = radians(angleDeg);
+  for (int i = 0; i < fractalPath.length(); i++) {
+    char c = fractalPath.charAt(i);
+    if (c == 'F') {
+      line(0, 0, length, 0);
+      translate(length, 0);
+    } else if (c == '+') {
+      rotate(angleRad);
+    } else if (c == '-') {
+      rotate(-angleRad);
+    }
   }
-  endShape(CLOSE);
-  
-  float s = map(sin(t), -1, 1, 0.2, 0.8);  
-  scale(s);
-  rotate(t);
 }
+// END OF YOUR CREATIVE CODE
+
 // === SYSTEM FRAMEWORK ===
 void setup() {
     size(1080, 1080);
@@ -52,7 +95,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v460";
+        String renderPath = "renders/render_v465";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();
