@@ -30,7 +30,7 @@ DO NOT write setup() or draw() functions - these are handled by the template.
 DO NOT use translate(), background(), size(), or frameRate() - these are handled by the template.
 
 The template provides:
-- Canvas setup (800x800)
+- Canvas setup (1080x1080)
 - Origin translation to center
 - Background clearing
 - Frame rate control
@@ -100,8 +100,9 @@ Let your creativity guide the direction - feel free to explore and experiment.
 
 === SYSTEM FRAMEWORK (Already Handled) ===
 The following is automatically handled by the system - DO NOT include these in your code:
-• Canvas setup: size(800, 800)
-• Frame rate: 60fps for 6-second loop
+• Canvas setup: size(1080, 1080)
+• Frame rate: 60 FPS
+• Animation duration: 6 seconds (360 frames)
 • Origin translation: translate(width/2, height/2)
 • Background clearing: background(0)
 • Progress variable: float progress = frameCount/totalFrames (0.0 to 1.0)

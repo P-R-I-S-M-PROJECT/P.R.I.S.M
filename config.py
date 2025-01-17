@@ -110,7 +110,7 @@ class Config:
             'last_updated': datetime.now().isoformat(),
             'parameters': {
                 'system': {
-                    'base_resolution': [800, 800],
+                    'base_resolution': [1080, 1080],
                     'frame_rate': 60,
                     'total_frames': 360,
                     'render_quality': 'P2D'

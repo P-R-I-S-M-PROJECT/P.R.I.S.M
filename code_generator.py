@@ -121,7 +121,7 @@ class ProcessingGenerator:
         
         required_parts = [
             'void setup()',
-            'size(800, 800)',
+            'size(1080, 1080)',
             'frameRate(60)',
             'void draw()',
             'background(0)',
@@ -410,7 +410,7 @@ Please fix these issues and return the corrected code."""
 
 // === SYSTEM FRAMEWORK ===
 void setup() {{
-    size(800, 800);
+    size(1080, 1080);
     frameRate(60);
     smooth();
     initSketch();  // Initialize user's sketch

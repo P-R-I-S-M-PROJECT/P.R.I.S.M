@@ -196,7 +196,7 @@ You MUST define these two functions:
 === SYSTEM FRAMEWORK ===
 The system automatically handles these - DO NOT include them:
 • void setup() or draw() functions
-• size(800, 800) and frameRate settings
+• size(1080, 1080) and frameRate settings
 • background(0) or any background clearing
 • translate(width/2, height/2) for centering
 • Frame saving and program exit
