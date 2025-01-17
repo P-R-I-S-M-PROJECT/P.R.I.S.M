@@ -349,7 +349,7 @@ Return your code between these markers:
         """Validate only essential Processing code requirements, being more lenient"""
         # Only validate the critical template structure
         required_structure = [
-            (r'void setup\(\)\s*{[^}]*size\(800,\s*800\)[^}]*}', "setup() function modified"),
+            (r'void setup\(\)\s*{[^}]*size\(1080,\s*1080\)[^}]*}', "setup() function modified"),
             (r'void draw\(\)\s*{.*background\(0\).*translate\(width/2,\s*height/2\)', "draw() function header modified"),
             (r'String\s+renderPath\s*=\s*"renders/render_v\d+"', "renderPath declaration missing/modified"),
             (r'saveFrame\(renderPath\s*\+\s*"/frame-####\.png"\)', "saveFrame call missing/modified")

@@ -1,73 +1,37 @@
 // === USER'S CREATIVE CODE ===
-float noiseScale = 0.003;
-int numPoints = 12;
-float radius = 250;
-float spiralGrowth = 15;
+int numPoints = 400;
+float a = 200;
+float b = 50;
 
 void initSketch() {
-  noFill();
+  stroke(255);
   strokeWeight(2);
+  noFill();
 }
 
 void runSketch(float progress) {
-  // Create multiple layers with different rotations and colors
-  for (int layer = 0; layer < 5; layer++) {
-    float layerProgress = (progress + (float)layer/5) % 1.0;
-    float rotation = layerProgress * TWO_PI;
+  float t = progress * TWO_PI;
+  float k = b / a;
+  
+  beginShape();
+  for (int i = 0; i < numPoints; i++) {
+    float angle = map(i, 0, numPoints, 0, TWO_PI);
+    float x = (a-b) * cos(angle) + b * cos((a-b)/b * angle);
+    float y = (a-b) * sin(angle) - b * sin((a-b)/b * angle);
     
-    // Color transition based on progress
-    float hue = (layerProgress * 255 + layer * 50) % 255;
-    stroke(hue, 200, 255, 150);
+    float r = map(sin(t*3 + angle*8), -1, 1, 100, 255);
+    float g = map(cos(t*2 + angle*4), -1, 1, 100, 255);
+    float b = map(sin(t + angle*12), -1, 1, 100, 255);
+    stroke(r, g, b);
     
-    beginShape();
-    for (float i = 0; i < numPoints; i++) {
-      float angle = map(i, 0, numPoints, 0, TWO_PI);
-      
-      // Morph between different shapes using noise
-      float noiseVal = noise(cos(angle) * noiseScale * (1 + layer),
-                            sin(angle) * noiseScale * (1 + layer),
-                            layerProgress * 2);
-      
-      float morphRadius = radius * (0.8 + 0.4 * noiseVal);
-      
-      // Add spiral effect
-      float spiralRadius = morphRadius + (i * spiralGrowth);
-      
-      // Calculate final position with rotation
-      float x = cos(angle + rotation) * spiralRadius;
-      float y = sin(angle + rotation) * spiralRadius;
-      
-      // Add subtle perlin noise movement
-      x += 20 * noise(layerProgress * 2 + i, 0);
-      y += 20 * noise(0, layerProgress * 2 + i);
-      
-      curveVertex(x, y);
-      
-      // Close the shape smoothly
-      if (i == 0 || i == numPoints-1) {
-        curveVertex(x, y);
-      }
-    }
-    endShape(CLOSE);
-    
-    // Draw connecting lines between layers
-    if (layer > 0) {
-      float prevRotation = ((progress + (float)(layer-1)/5) % 1.0) * TWO_PI;
-      for (int i = 0; i < numPoints; i += 2) {
-        float angle = map(i, 0, numPoints, 0, TWO_PI);
-        float x1 = cos(angle + rotation) * radius;
-        float y1 = sin(angle + rotation) * radius;
-        float x2 = cos(angle + prevRotation) * (radius + spiralGrowth);
-        float y2 = sin(angle + prevRotation) * (radius + spiralGrowth);
-        
-        stroke(hue, 200, 255, 50);
-        line(x1, y1, x2, y2);
-      }
-    }
+    vertex(x * (1 + 0.2*sin(t)), y * (1 + 0.2*cos(t)));
   }
+  endShape(CLOSE);
+  
+  float s = map(sin(t), -1, 1, 0.2, 0.8);  
+  scale(s);
+  rotate(t);
 }
-// END OF YOUR CREATIVE CODE
-
 // === SYSTEM FRAMEWORK ===
 void setup() {
     size(1080, 1080);
@@ -88,7 +52,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v459";
+        String renderPath = "renders/render_v460";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();
