@@ -14,7 +14,7 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
 - Python 3.8+
 - Processing 4.0+ (must be installed at "C:\Program Files\processing-4.3\processing-java.exe")
 - PowerShell 7+ (Windows)
-- FFmpeg (included in scripts/ffmpeg.exe)
+- FFmpeg (Download from https://ffmpeg.org/download.html and place ffmpeg.exe in the scripts/ directory)
 
 ## Important Structure
 
