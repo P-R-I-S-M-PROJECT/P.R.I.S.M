@@ -1,9 +1,10 @@
 from pathlib import Path
 import yaml
 from datetime import datetime
-from typing import Dict, Any, TYPE_CHECKING
+from typing import Dict, Any, TYPE_CHECKING, List
 import os
 from dotenv import load_dotenv
+import random
 
 if TYPE_CHECKING:
     from database_manager import DatabaseManager
@@ -32,16 +33,94 @@ class Config:
         
         # Model configuration
         self.model_config = {
-            'available_models': ['o1', 'o1-mini', '4o', 'claude-3-opus', 'claude-3.5-sonnet'],
+            'available_models': ['o1', 'o1-mini', '4o', 'claude-3-opus', 'claude-3.5-sonnet', 'flux'],
             'default_model': '4o',
             'model_selection': 'random',  # 'random' or specific model name
             'model_weights': {
-                '4o': 0.2,
-                'o1': 0.2,
-                'o1-mini': 0.2,
-                'claude-3-opus': 0.2,    # Best quality, slower
-                'claude-3.5-sonnet': 0.2  # Latest model, balanced performance
+                '4o': 0.167,
+                'o1': 0.167,
+                'o1-mini': 0.167,
+                'claude-3-opus': 0.167,   
+                'claude-3.5-sonnet': 0.167, 
+                'flux': 0.167  # Flux with internal variants
             }
+        }
+        
+        # Static Image Generation Configuration
+        self.static_image_config = {
+            'models': {
+                'flux': {
+                    'variants': {
+                        'pro': {
+                            'endpoint': 'fal-ai/flux-pro/new',
+                            'description': 'High quality image generation',
+                            'weight': 0.33
+                        },
+                        'schnell': {
+                            'endpoint': 'fal-ai/flux/schnell',
+                            'description': 'Fast turbo mode generation',
+                            'weight': 0.33
+                        },
+                        'dev': {
+                            'endpoint': 'fal-ai/flux/dev',
+                            'description': 'Development mode with latest features',
+                            'weight': 0.34
+                        }
+                    }
+                }
+            },
+            'categories': {
+                'subject': [
+                    'animal', 'architecture', 'art', 'character', 
+                    'nature', 'people', 'phenomena', 'science'
+                ],
+                'style': [
+                    'cinematic', 'photography', 'painting', 'digital_art',
+                    'concept_art', 'abstract', 'realistic', 'surreal'
+                ],
+                'mood': [
+                    'dramatic', 'peaceful', 'mysterious', 'energetic',
+                    'melancholic', 'ethereal', 'dark', 'vibrant'
+                ],
+                'composition': [
+                    'close_up', 'wide_shot', 'aerial_view', 'macro',
+                    'portrait', 'landscape', 'abstract_composition'
+                ]
+            },
+            'prompt_templates': [
+                "[subject] in style of [style], [mood] atmosphere, [composition] view",
+                "A [mood] interpretation of [subject] through [style] lens",
+                "[style] exploration of [subject] with [mood] undertones",
+                "The mathematics of [mood] divide endlessly into fractals of [subject]",
+                "[subject] frequencies slice through [composition], leaving trails of [mood]"
+            ],
+            'quality_modifiers': {
+                'detail_level': ['intricate', 'highly detailed', 'minimalist'],
+                'lighting': ['dramatic lighting', 'soft light', 'backlit'],
+                'color_scheme': ['monochromatic', 'vibrant colors', 'muted palette'],
+                'texture': ['smooth', 'rough', 'organic', 'metallic']
+            },
+            'evaluation_criteria': {
+                'technical': ['composition', 'color_harmony', 'detail_quality'],
+                'artistic': ['creativity', 'emotional_impact', 'uniqueness'],
+                'conceptual': ['theme_clarity', 'narrative_strength', 'symbolism']
+            }
+        }
+        
+        # Integration settings
+        self.static_integration = {
+            'use_existing_db': True,  # Use main PRISM database
+            'shared_evolution': True,  # Share evolution system
+            'specialized_metrics': True,  # Use image-specific metrics
+            'template_mixing': True  # Allow mixing code and image templates
+        }
+        
+        # Performance thresholds
+        self.static_thresholds = {
+            'min_quality_score': 75.0,
+            'innovation_boost': 1.2,
+            'complexity_factor': 1.1,
+            'style_consistency': 0.85
         }
         
         # Initialize components
@@ -314,3 +393,40 @@ class Config:
             self.model_config['model_selection'] = mode
         else:
             raise ValueError(f"Invalid model selection mode: {mode}")
+    
+    def get_prompt_template(self, category: str = None) -> str:
+        """Get a prompt template, optionally filtered by category"""
+        templates = self.static_image_config['prompt_templates']
+        if not category:
+            return random.choice(templates)
+        return next((t for t in templates if category in t), random.choice(templates))
+    
+    def get_quality_modifiers(self, complexity: float) -> List[str]:
+        """Get appropriate quality modifiers based on complexity"""
+        modifiers = []
+        if complexity > 0.7:
+            modifiers.extend([
+                random.choice(self.static_image_config['quality_modifiers']['detail_level']),
+                random.choice(self.static_image_config['quality_modifiers']['lighting'])
+            ])
+        if complexity > 0.8:
+            modifiers.append(
+                random.choice(self.static_image_config['quality_modifiers']['texture'])
+            )
+        return modifiers
+    
+    def evaluate_static_image(self, metrics: Dict) -> float:
+        """Evaluate a static image using specialized criteria"""
+        weights = {
+            'technical': 0.4,
+            'artistic': 0.4,
+            'conceptual': 0.2
+        }
+        
+        score = 0.0
+        for category, weight in weights.items():
+            criteria = self.static_image_config['evaluation_criteria'][category]
+            category_score = sum(metrics.get(c, 0) for c in criteria) / len(criteria)
+            score += category_score * weight
+            
+        return score

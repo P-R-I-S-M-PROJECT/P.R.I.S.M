@@ -22,8 +22,15 @@ class PatternEvolution:
             # Get successful synergy pairs
             synergy_pairs = self.db.get_synergy_pairs(min_score=80.0)
             
+            # Determine if we're generating for Flux (static) or Processing (animation)
+            is_static = self.config.model_config.get('model_selection') == 'flux'
+            
             # Select 1-4 techniques with better distribution
-            num_techniques = random.randint(1, 4)
+            # For static images, prefer 2-3 techniques for better composition
+            if is_static:
+                num_techniques = random.randint(2, 3)
+            else:
+                num_techniques = random.randint(1, 4)
             
             # Create weighted pool of techniques
             technique_pool = []
@@ -39,6 +46,10 @@ class PatternEvolution:
                             stats['innovation_factor'] * 0.3
                         )
                         weight *= performance_weight
+                        
+                        # For static images, boost visual techniques
+                        if is_static and any(x in tech.lower() for x in ['color', 'pattern', 'texture', 'composition']):
+                            weight *= 1.3
                         
                         # Boost weight based on adaptation rate
                         if stats.get('adaptation_rate', 1.0) > 1.1:
@@ -170,6 +181,14 @@ class PatternEvolution:
             # Add combined techniques data for synergy tracking
             combined_techniques = [t for t in technique.synergy_scores.keys()]
             performance['combined_techniques'] = combined_techniques
+            
+            # Check if this was a static image generation
+            is_static = self.config.model_config.get('model_selection') == 'flux'
+            if is_static:
+                # For static images, adjust evolution metrics
+                performance['aesthetic_weight'] = 1.2  # Boost aesthetic importance
+                performance['motion_weight'] = 0.1    # Reduce motion importance
+                performance['complexity_weight'] = 1.1 # Slightly boost complexity
             
             # Create evolved version with enhanced learning
             evolved = technique.evolve(performance)

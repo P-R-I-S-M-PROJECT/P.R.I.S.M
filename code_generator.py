@@ -10,6 +10,7 @@ from config import Config
 import json
 import time
 import random
+from models.flux import FluxGenerator
 
 class ProcessingGenerator:
     def __init__(self, config: Config, logger: ArtLogger = None):
@@ -21,11 +22,13 @@ class ProcessingGenerator:
         from models.openai_o1 import OpenAIO1Generator
         from models.openai_4o import OpenAI4OGenerator
         from models.claude_generator import ClaudeGenerator
+        from models.flux import FluxGenerator
         
         # Create single instances
         self.o1_generator = OpenAIO1Generator(config, self.log)
         self.o4_generator = OpenAI4OGenerator(config, self.log)
         self.claude_generator = ClaudeGenerator(config, self.log)
+        self.flux_generator = FluxGenerator(config, self.log)
         
         # Initialize pattern analyzer
         self.analyzer = PatternAnalyzer(config, self.log)
@@ -41,7 +44,8 @@ class ProcessingGenerator:
             'o1-mini': self.o1_generator,  # Same instance for both O1 variants
             '4o': self.o4_generator,
             'claude-3-opus': self.claude_generator,  # Same instance for both Claude variants
-            'claude-3.5-sonnet': self.claude_generator
+            'claude-3.5-sonnet': self.claude_generator,
+            'flux': self.flux_generator
         }
         self._current_model = None
     
@@ -70,6 +74,15 @@ class ProcessingGenerator:
             generator = self.ai_generators[self._current_model]
             if hasattr(generator, '_select_claude_model'):
                 generator._select_claude_model(self._current_model)
+            
+            # Special handling for Flux model
+            if self._current_model == 'flux':
+                # For Flux, we just need to generate the image
+                prompt = ", ".join(technique_names)
+                result = generator.generate_with_ai(prompt)
+                if result:
+                    return "Image generated successfully"  # Dummy code for Flux model
+                return None
             
             # Get next version from config (which scans renders directory)
             next_version = self.config.get_next_version()

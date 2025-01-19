@@ -33,6 +33,10 @@ class PatternAnalyzer:
                 self.log.error(f"Render path does not exist: {render_path}")
                 return self._get_default_scores()
             
+            # Check if this is a static image (Flux) pattern
+            is_static = bool(list(render_path.glob("image_v*.png")))
+            self.log.debug(f"Pattern type: {'static image' if is_static else 'animation'}")
+            
             frames = self._load_frames(render_path)
             if not frames:
                 self.log.error("No frames loaded for analysis")
@@ -40,21 +44,22 @@ class PatternAnalyzer:
             
             self.log.debug(f"Analyzing {len(frames)} frames")
             
-            # Calculate core metrics with more diverse weighting
+            # Calculate core metrics with adjusted weights for static images
             try:
                 complexity = self._calculate_complexity(frames)
+                if is_static:
+                    # For static images, boost complexity score for detail
+                    complexity *= 1.2
                 self.log.debug(f"Raw complexity score: {complexity:.2f}")
-                # Removed hardcoded technique-specific boosts to maintain creative freedom
-                self.log.debug(f"Final complexity score: {complexity:.2f}")
             except Exception as e:
                 self.log.error(f"Complexity calculation failed: {e}")
                 complexity = 60.0 + np.random.normal(0, 5)
             
             try:
                 innovation = self._calculate_innovation(frames, pattern)
-                # Boost innovation for certain technique combinations
-                if len(pattern.techniques) >= 3:
-                    innovation *= 1.15
+                if is_static:
+                    # For static images, focus more on visual uniqueness
+                    innovation *= 1.1
                 self.log.debug(f"Innovation score: {innovation:.2f}")
             except Exception as e:
                 self.log.error(f"Innovation calculation failed: {e}")
@@ -62,9 +67,9 @@ class PatternAnalyzer:
             
             try:
                 aesthetic = self._calculate_aesthetic_score(frames) * 100
-                # Adjust aesthetic based on frame analysis
-                if np.std([np.std(f) for f in frames]) > 0.1:  # High variation between frames
-                    aesthetic *= 1.1
+                if is_static:
+                    # For static images, boost aesthetic importance
+                    aesthetic *= 1.15
                 self.log.debug(f"Aesthetic score: {aesthetic:.2f}")
             except Exception as e:
                 self.log.error(f"Aesthetic calculation failed: {e}")
@@ -72,6 +77,9 @@ class PatternAnalyzer:
             
             try:
                 motion = self._calculate_motion_quality(frames) * 100
+                if is_static:
+                    # For static images, motion score represents stability
+                    motion = 95.0  # High score for perfect stability
                 self.log.debug(f"Motion score: {motion:.2f}")
             except Exception as e:
                 self.log.error(f"Motion calculation failed: {e}")
@@ -80,6 +88,9 @@ class PatternAnalyzer:
             # Calculate new metrics
             try:
                 coherence = self._calculate_visual_coherence(frames) * 100
+                if is_static:
+                    # For static images, boost coherence importance
+                    coherence *= 1.1
                 self.log.debug(f"Coherence score: {coherence:.2f}")
             except Exception as e:
                 self.log.error(f"Coherence calculation failed: {e}")
@@ -92,8 +103,9 @@ class PatternAnalyzer:
                 self.log.error(f"Synergy calculation failed: {e}")
                 synergy = 75.0 + np.random.normal(0, 5)
             
-            # Dynamic weighting based on pattern characteristics
-            weights = self._calculate_dynamic_weights(pattern, complexity, innovation, aesthetic, motion)
+            # Dynamic weighting based on pattern characteristics and type
+            weights = self._calculate_dynamic_weights(pattern, complexity, innovation, 
+                                                    aesthetic, motion, is_static)
             
             # Combine metrics with dynamic weighting
             overall_score = (
@@ -104,8 +116,12 @@ class PatternAnalyzer:
             )
             
             # Adjust overall score based on coherence and synergy
-            overall_score *= (1.0 + (coherence - 75) / 200)  # Small boost/penalty based on coherence
-            overall_score *= (1.0 + (synergy - 75) / 200)    # Small boost/penalty based on synergy
+            overall_score *= (1.0 + (coherence - 75) / 200)
+            overall_score *= (1.0 + (synergy - 75) / 200)
+            
+            # For static images, ensure minimum quality threshold
+            if is_static and overall_score < 50:
+                overall_score = 50 + (overall_score / 2)
             
             # Ensure score stays within bounds
             overall_score = float(max(10.0, min(100.0, overall_score)))
@@ -135,7 +151,22 @@ class PatternAnalyzer:
                 self.log.error(f"Render path does not exist: {render_path}")
                 return []
             
-            # Look for frames in the correct subdirectory
+            # First check for static image (Flux)
+            static_images = list(render_path.glob("image_v*.png"))
+            if static_images:
+                self.log.debug(f"Found static image: {static_images[0]}")
+                try:
+                    frame = cv2.imread(str(static_images[0]), cv2.IMREAD_GRAYSCALE)
+                    if frame is not None:
+                        # For static images, create a list of identical frames for compatibility
+                        frames = [frame] * 10  # Use 10 copies for analysis
+                        self.log.debug("Successfully loaded static image")
+                        return frames
+                except Exception as e:
+                    self.log.error(f"Error loading static image: {e}")
+                    return []
+            
+            # If no static image, look for animation frames
             frames_dir = render_path / "frames"
             if frames_dir.exists():
                 frame_path = frames_dir
@@ -165,15 +196,6 @@ class PatternAnalyzer:
                         self.log.error(f"Failed to load frame (returned None): {frame_path}")
                 except Exception as e:
                     self.log.error(f"Error loading individual frame {frame_path}: {e}")
-                
-            self.log.debug(f"Successfully loaded {len(frames)} frames")
-            
-            if not frames:
-                self.log.error("No frames were successfully loaded")
-            else:
-                # Log frame properties for debugging
-                sample_frame = frames[0]
-                self.log.debug(f"Sample frame shape: {sample_frame.shape}, dtype: {sample_frame.dtype}")
             
             return frames
             
@@ -310,6 +332,9 @@ class PatternAnalyzer:
         """Calculate motion quality with artistic vision principles"""
         try:
             if len(frames) < 2:
+                # For static images (Flux), return high motion score for stability
+                if len(frames) == 1:
+                    return 0.95
                 return 0.5
             
             motion_scores = []
@@ -455,17 +480,28 @@ class PatternAnalyzer:
                                  complexity: float, 
                                  innovation: float, 
                                  aesthetic: float, 
-                                 motion: float) -> Dict[str, float]:
+                                 motion: float,
+                                 is_static: bool = False) -> Dict[str, float]:
         """Calculate dynamic weights based on pattern characteristics"""
-        weights = {
-            'complexity': 0.25,
-            'innovation': 0.35,
-            'aesthetic': 0.25,
-            'motion': 0.15
-        }
+        if is_static:
+            # For static images, prioritize aesthetic and complexity
+            weights = {
+                'complexity': 0.35,  # Increased for static
+                'innovation': 0.25,  # Slightly reduced
+                'aesthetic': 0.35,   # Increased for static
+                'motion': 0.05      # Minimal for static
+            }
+        else:
+            # Original weights for animations
+            weights = {
+                'complexity': 0.25,
+                'innovation': 0.35,
+                'aesthetic': 0.25,
+                'motion': 0.15
+            }
         
         # Add motion weight adjustment
-        if motion > 80:
+        if motion > 80 and not is_static:
             weights['motion'] += 0.1
             weights['complexity'] -= 0.05
             weights['innovation'] -= 0.05
@@ -482,17 +518,6 @@ class PatternAnalyzer:
             weights['complexity'] += 0.05
             weights['aesthetic'] -= 0.05
             weights['motion'] -= 0.05
-        
-        # Adjust weights based on score distributions
-        if complexity > 80:
-            weights['complexity'] += 0.1
-            weights['innovation'] -= 0.05
-            weights['aesthetic'] -= 0.05
-        
-        if innovation > 85:
-            weights['innovation'] += 0.1
-            weights['complexity'] -= 0.05
-            weights['aesthetic'] -= 0.05
         
         # Normalize weights to sum to 1
         total = sum(weights.values())

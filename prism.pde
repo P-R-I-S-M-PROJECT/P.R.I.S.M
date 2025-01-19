@@ -1,55 +1,26 @@
 // === USER'S CREATIVE CODE ===
-float phi = (1 + sqrt(5)) / 2;  // golden ratio
-float angle = 0;
-float radius = 300;
-int numPoints = 200;
-float[] radii = new float[numPoints];
-
-void initSketch() {
-  noFill();
-  strokeWeight(2);
-  
-  // Initialize radii using golden ratio
-  for (int i = 0; i < numPoints; i++) {
-    radii[i] = 100 * pow(phi, i/10.0);
+void runSketch(float progress) {
+  float maxRadius = 300;
+  int numSpirals = 12;
+  float angleOffset = TWO_PI / numSpirals;
+  float waveFrequency = 3.0;
+  for (int i = 0; i < numSpirals; i++) {
+      float angle = i * angleOffset + progress * TWO_PI;
+      float radius = maxRadius * noise(i * 0.1, progress * 2.0);
+      beginShape();
+      for (float a = 0; a < TWO_PI; a += 0.1) {
+          float wave = sin(a * waveFrequency + progress * TWO_PI) * 50;
+          float x = (radius + wave) * cos(a + angle);
+          float y = (radius + wave) * sin(a + angle);
+          stroke(200 - a * 30, 100 + a * 50, 255);
+          vertex(x, y);
+      }
+      endShape(CLOSE);
   }
 }
 
-void runSketch(float progress) {
-  float t = progress * TWO_PI;
-  
-  stroke(255, 150, 0);
-  
-  // Draw spiraling cardioids 
-  for (int i = 0; i < 8; i++) {
-    pushMatrix();
-    rotate(i * PI/4 + t);
-    
-    beginShape();
-    for (int j = 0; j < numPoints; j++) {
-      float a = map(j, 0, numPoints, 0, TWO_PI);
-      float r = radii[j] * (1 - sin(t*2 + i)) * (1 + cos(a*8)) / 2;
-      float x = r * cos(a);
-      float y = r * sin(a);
-      vertex(x, y);
-    }
-    endShape(CLOSE);
-    
-    popMatrix();
-  }
-  
-  stroke(0, 255, 150);
-  
-  // Draw central golden spiral 
-  beginShape();
-  for (int i = 0; i < 500; i++) {
-    float a = i * radians(137.5); // golden angle  
-    float r = radius * sqrt(i/500.0);
-    float x = r * cos(a + t);
-    float y = r * sin(a + t);
-    vertex(x, y);
-  }
-  endShape();
+void initSketch() {
+  // Initialize sketch
 }
 // END OF YOUR CREATIVE CODE
 
@@ -73,7 +44,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v5";
+        String renderPath = "renders/render_v1";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();

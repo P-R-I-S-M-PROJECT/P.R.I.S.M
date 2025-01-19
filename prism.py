@@ -153,12 +153,13 @@ Top Technique Combinations:""")
             print("4. 4O")
             print("5. Claude 3.5 Sonnet")
             print("6. Claude 3 Opus")
-            print("7. Back to Generation Menu")
+            print("7. Flux")
+            print("8. Back to Generation Menu")
             
             current_model = self.config.model_config['model_selection']
             print(f"\nCurrent Model: {current_model}")
             
-            choice = input("\nEnter your choice (1-7): ")
+            choice = input("\nEnter your choice (1-8): ")
             
             model_map = {
                 "1": "random",
@@ -166,7 +167,8 @@ Top Technique Combinations:""")
                 "3": "o1-mini",
                 "4": "4o",
                 "5": "claude-3.5-sonnet",
-                "6": "claude-3-opus"
+                "6": "claude-3-opus",
+                "7": "flux"
             }
             
             if choice in model_map:
@@ -174,7 +176,7 @@ Top Technique Combinations:""")
                 print(f"\nModel set to: {model_map[choice]}")
                 input("Press Enter to continue...")
                 return True  # Return to generation menu
-            elif choice == "7":
+            elif choice == "8":
                 return True  # Return to generation menu
             else:
                 print("\nInvalid choice. Please try again.")
@@ -203,6 +205,30 @@ Top Technique Combinations:""")
             # Convert numpy strings to regular strings for display and storage
             technique_names = [str(t.name) for t in techniques]
             self.log.info(f"Creative approach: {technique_names}")
+            
+            # Log which model we're using
+            current_model = self.config.model_config['model_selection']
+            self.log.info(f"Using model: {current_model}")
+            
+            # For Flux model, let user select variant
+            if current_model == "flux":
+                print("\nSelect Flux model variant:")
+                variants = self.config.static_image_config['models']['flux']['variants']
+                for i, (name, info) in enumerate(variants.items(), 1):
+                    print(f"{i}. {name.upper()} - {info['description']}")
+                
+                while True:
+                    try:
+                        choice = input("\nEnter choice (1-3): ").strip()
+                        if not choice.isdigit() or not (1 <= int(choice) <= 3):
+                            print("Please enter a number between 1 and 3")
+                            continue
+                        variant_names = list(variants.keys())
+                        selected_variant = variant_names[int(choice)-1]
+                        self.config.static_image_config['models']['flux']['selected_variant'] = selected_variant
+                        break
+                    except (ValueError, IndexError):
+                        print("Invalid selection, please try again")
             
             # Generate code and run sketch
             next_version = self.config.get_next_version()

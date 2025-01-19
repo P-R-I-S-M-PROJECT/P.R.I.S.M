@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$RenderPath = "",
     [Parameter(Mandatory=$false)]
-    [string]$Metadata = "{}"
+    [string]$Metadata = "{}",
+    [Parameter(Mandatory=$false)]
+    [string]$Mode = "processing"  # Can be "processing" or "flux"
 )
 
 # Configuration
@@ -31,6 +33,46 @@ if ($renderVersion) {
 # Create render directory if it doesn't exist
 if (-not (Test-Path $RenderPath)) {
     New-Item -ItemType Directory -Path $RenderPath | Out-Null
+}
+
+# Function to handle Flux static image
+function Handle-FluxImage {
+    param(
+        [string]$RenderPath,
+        [string]$Version,
+        [string]$Metadata
+    )
+    
+    # For Flux, we already have the image saved as frame-0000.png
+    # Just create metadata and rename the image to match our pattern
+    $timestamp = [int64](Get-Date -UFormat %s) * 1000
+    $inputImage = Join-Path $RenderPath "frame-0000.png"
+    $finalImage = Join-Path $RenderPath "image_v$Version-$timestamp.png"
+    
+    if (Test-Path $inputImage) {
+        # Rename the image to include version and timestamp
+        Move-Item -Path $inputImage -Destination $finalImage -Force
+        
+        # Create metadata file
+        $metadataFile = Join-Path $RenderPath "image_v$Version-$timestamp.json"
+        $Metadata | Out-File -FilePath $metadataFile -Encoding UTF8
+        
+        Write-Host "Image saved as: $finalImage"
+        Write-Host "Metadata saved as: $metadataFile"
+        return $true
+    } else {
+        Write-Error "Static image not found: $inputImage"
+        return $false
+    }
+    
+    return $false
+}
+
+# Handle based on mode
+if ($Mode -eq "flux") {
+    Write-Host "Processing Flux static image..."
+    $result = Handle-FluxImage -RenderPath $RenderPath -Version $renderVersion -Metadata $Metadata
+    return $result
 }
 
 # Copy prism.pde to render directory
