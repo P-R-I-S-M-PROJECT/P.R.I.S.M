@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/images/banner.png" alt="PRISM Banner" width="100%">
+</div>
+
 # PRISM - Pattern Recognition & Interactive Sketch Machine
 
 PRISM is an AI-driven creative system that generates sophisticated geometric animations using Processing and static images using FAL's Flux AI. It functions as an interactive art studio with evolutionary memory, treating each creation as a data point in a living system.
