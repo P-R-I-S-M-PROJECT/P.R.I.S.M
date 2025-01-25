@@ -55,8 +55,8 @@ class ArtLogger:
 ║   ██║     ██║  ██║██║███████║██║ ╚═╝ ██║                                 ║
 ║   ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝     ╚═╝                                 ║
 ║                                                                           ║
-║   Pattern Recognition & Interactive Sketch Machine                        ║
-║   [ Generative Art System v1.0 ]                                         ║
+║   Pattern Recognition & Interactive Studio Machine                        ║
+║   [ AI-Powered Creative Studio v1.0 ]                                    ║
 ║                                                                           ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
         """)

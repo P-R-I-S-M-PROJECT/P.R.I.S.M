@@ -57,7 +57,36 @@ class FluxGenerator:
         self.current_innovation = 0.5
         self.selected_size = None
         self.selected_model = None
-        self.model_selected = False  # Add flag to track if model has been selected
+        self.model_selected = False
+        self.variant_selected = False
+        
+        # Initialize config structure if it doesn't exist
+        if 'models' not in self.config.static_image_config:
+            self.config.static_image_config['models'] = {}
+        if 'flux' not in self.config.static_image_config['models']:
+            self.config.static_image_config['models']['flux'] = {}
+        
+        # Load previously selected variant if it exists
+        flux_config = self.config.static_image_config['models']['flux']
+        if 'selected_variant' in flux_config:
+            try:
+                variant = flux_config['selected_variant']
+                self.selected_model = FluxModel[variant.upper()]
+                self.model_selected = True
+                self.variant_selected = True
+                
+                # Load size if it exists
+                if 'selected_size' in flux_config:
+                    size = flux_config['selected_size']
+                    self.selected_size = ImageSize[size.upper()]
+                    
+                self.log.debug(f"Loaded saved variant: {variant} and size: {size if 'selected_size' in flux_config else 'None'}")
+            except Exception as e:
+                self.log.error(f"Error loading saved variant: {e}")
+                # Reset state if loading fails
+                self.selected_model = None
+                self.model_selected = False
+                self.variant_selected = False
         
         # Initialize analysis and evolution systems
         self.analyzer = PatternAnalyzer(config)
@@ -73,10 +102,10 @@ class FluxGenerator:
 
     def _select_model_and_size(self):
         """Prompt user to select image size and use the selected Flux variant"""
-        # Only prompt for model selection if not already selected
-        if not self.model_selected:
-            print("\nSelect Flux model variant:")
+        # Only prompt for model variant if not already selected
+        if not self.variant_selected or self.selected_model is None:
             variants = self.config.static_image_config['models']['flux']['variants']
+            print("\nSelect Flux model variant:")
             for i, (name, info) in enumerate(variants.items(), 1):
                 print(f"{i}. {name.upper()} - {info['description']}")
             
@@ -88,18 +117,18 @@ class FluxGenerator:
                         continue
                     variant_names = list(variants.keys())
                     selected_variant = variant_names[int(choice)-1]
-                    self.config.static_image_config['models']['flux']['selected_variant'] = selected_variant
                     self.selected_model = FluxModel[selected_variant.upper()]
-                    self.model_selected = True  # Set flag to indicate model has been selected
+                    self.model_selected = True
+                    self.variant_selected = True
+                    
+                    # Save to config immediately
+                    self.config.static_image_config['models']['flux']['selected_variant'] = selected_variant
+                    self.config.save_metadata()
                     break
                 except (ValueError, IndexError):
                     print("Invalid selection, please try again")
-        else:
-            # Reuse previously selected variant
-            selected_variant = self.config.static_image_config['models']['flux'].get('selected_variant', 'pro')
-            self.selected_model = FluxModel[selected_variant.upper()]
         
-        # Always prompt for image size if not selected
+        # Only prompt for image size if not selected
         if self.selected_size is None:
             print("\nSelect image size:")
             sizes = list(ImageSize)
@@ -122,6 +151,10 @@ class FluxGenerator:
                         print("Please enter a number between 1 and 6")
                         continue
                     self.selected_size = sizes[int(choice)-1]
+                    
+                    # Save to config immediately
+                    self.config.static_image_config['models']['flux']['selected_size'] = self.selected_size.name
+                    self.config.save_metadata()
                     break
                 except (ValueError, IndexError):
                     print("Invalid selection, please try again")
@@ -145,17 +178,23 @@ class FluxGenerator:
             
             creative_prompt = self._build_creative_prompt(techniques)
             
-            # Select model and size if not already selected
-            self._select_model_and_size()
+            # Only select model and size if not already selected
+            if not self.variant_selected or self.selected_size is None:
+                self._select_model_and_size()
+                # Save selections to config
+                self.config.static_image_config['models']['flux']['selected_variant'] = self.selected_model.name.lower()
+                self.config.static_image_config['models']['flux']['selected_size'] = self.selected_size.name
+                self.config.save_metadata()
+                self.log.debug(f"Saved variant {self.selected_model.name} and size {self.selected_size.name} to config")
+            else:
+                self.log.debug(f"Using saved variant {self.selected_model.name} and size {self.selected_size.name}")
             
             flux_config = self._build_flux_config()
             flux_config.image_size = self.selected_size
             flux_config.model = self.selected_model
             
-            print(f"\nGenerating image with:")
-            print(f"Model: {self.selected_model.name} - {FluxModel.get_description(self.selected_model)}")
-            print(f"Size: {self.selected_size.name}")
-            print(f"Prompt: {creative_prompt}")
+            # Always show the creative prompt
+            self.log.info(f"Creative prompt: {creative_prompt}")
 
             # Create metadata before generation
             metadata = {

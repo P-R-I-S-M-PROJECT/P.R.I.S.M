@@ -10,28 +10,51 @@ from logger import ArtLogger
 from pattern_evolution import PatternEvolution
 from cleanup import SystemCleaner
 from datetime import datetime
+from database_manager import DatabaseManager
 from models import Pattern
 from tests import TestRunner
+from models.flux import FluxGenerator
 import json
-from typing import Dict
+from typing import Dict, List
 import sys
+import random
 
 # Load environment variables
 load_dotenv()
 
 class PRISM:
-    def __init__(self, config: Config):
-        self.debug_mode = False
-        self.log = ArtLogger(debug_enabled=self.debug_mode)
-        self.config = config
-        self.db = config.db_manager
+    def __init__(self):
+        """Initialize PRISM system"""
+        self.config = Config()  # Initialize without arguments
+        self.log = ArtLogger()
+        self.debug_mode = False  # Add debug_mode initialization
+        self.selected_model = None
+        self.flux_generator = None  # Initialize flux_generator to None
+        
+        # Initialize database
+        self.db = DatabaseManager(self.config)
+        
+        # Load system stats
+        stats = self.db.get_system_stats()
+        if stats:
+            self.log.info("\nPattern Statistics:")
+            self.log.info(f"• Total Patterns: {stats['total_patterns']}")
+            self.log.info(f"• Latest Version: v{stats['latest_version']}")
+            self.log.info(f"• High Scoring Patterns: {stats['high_scoring_patterns']}")
+            self.log.info("\nPerformance Metrics:")
+            self.log.info(f"• Average Score: {stats['avg_score']:.2f}")
+            self.log.info(f"• Average Innovation: {stats['avg_innovation']:.2f}")
+            self.log.info(f"• Average Complexity: {stats['avg_complexity']:.2f}")
+            self.log.info("\nTop Technique Combinations:")
+            for combo in stats.get('top_technique_combinations', []):
+                self.log.info(f"• {combo}")
         
         # Initialize components with shared logger
-        self.generator = ProcessingGenerator(config, self.log)
-        self.docs = DocumentationManager(config, self.log)
-        self.evolution = PatternEvolution(config, self.log)
-        self.cleaner = SystemCleaner(config, self.log)
-        self.test_runner = TestRunner(config, self.generator, self.evolution, self.db)
+        self.generator = ProcessingGenerator(self.config, self.log)
+        self.docs = DocumentationManager(self.config, self.log)
+        self.evolution = PatternEvolution(self.config, self.log)
+        self.cleaner = SystemCleaner(self.config, self.log)
+        self.test_runner = TestRunner(self.config, self.generator, self.evolution, self.db)
         
         # Add npm installation tracking
         self._npm_installed = False
@@ -72,8 +95,8 @@ Top Technique Combinations:""")
         while True:
             self.log.title("PRISM GENERATION SYSTEM")
             print("\nOptions:")
-            print("1. Generate Patterns")
-            print("2. Cleanup System")
+            print("1. Create Art")
+            print("2. Studio Cleanup")
             print("3. Toggle Debug Mode")
             print("4. Test O1 Models")
             print("5. Test Claude Models")
@@ -82,7 +105,7 @@ Top Technique Combinations:""")
             choice = input("\nEnter your choice (1-6): ")
             
             if choice == "1":
-                self._show_generation_menu()
+                self._show_creation_flow()
             elif choice == "2":
                 self.cleanup_system()
             elif choice == "3":
@@ -92,20 +115,60 @@ Top Technique Combinations:""")
             elif choice == "5":
                 self.test_runner.test_claude_models()
             elif choice == "6":
-                self.log.title("Exiting System")
+                self.log.title("Exiting Studio")
                 break
             else:
                 print("\nInvalid choice. Please try again.")
     
+    def _show_creation_flow(self):
+        """Show streamlined creation flow"""
+        self.log.title("SELECT CREATIVE MODEL")
+        print("\nAvailable Models:")
+        print("1. Random")
+        print("2. O1")
+        print("3. O1-mini")
+        print("4. 4O")
+        print("5. Claude 3.5 Sonnet")
+        print("6. Claude 3 Opus")
+        print("7. Flux (Static artwork)")
+        print("8. Back to Main Menu")
+        
+        choice = input("\nEnter your choice (1-8): ")
+        
+        model_map = {
+            "1": "random",
+            "2": "o1",
+            "3": "o1-mini",
+            "4": "4o",
+            "5": "claude-3.5-sonnet",
+            "6": "claude-3-opus",
+            "7": "flux"
+        }
+        
+        if choice in model_map:
+            self.selected_model = model_map[choice]
+            self.config.model_config['model_selection'] = self.selected_model
+            
+            # Initialize Flux generator if selected
+            if self.selected_model == "flux":
+                if self.flux_generator is None:
+                    self.flux_generator = FluxGenerator(self.config, self.log)
+            
+            self._show_generation_menu()
+        elif choice == "8":
+            return
+        else:
+            print("\nInvalid choice. Please try again.")
+    
     def _show_generation_menu(self):
         """Show generation options menu"""
         while True:
-            self.log.title("PATTERN GENERATION OPTIONS")
-            print("\nGeneration Mode:")
-            print("1. Single Pattern")
-            print("2. Multiple Patterns")
-            print("3. Continuous Generation")
-            print("4. Select Model")
+            self.log.title("CREATION OPTIONS")
+            print("\nCreation Mode:")
+            print("1. Single Creation")
+            print("2. Multiple Pieces")
+            print("3. Continuous Studio")
+            print("4. Back to Model Selection")
             print("5. Back to Main Menu")
             
             current_model = self.config.model_config['model_selection']
@@ -118,17 +181,17 @@ Top Technique Combinations:""")
                 input("\nPress Enter to continue...")
             elif choice == "2":
                 try:
-                    count = int(input("How many patterns to generate? "))
+                    count = int(input("How many pieces to create? "))
                     if count > 0:
                         for i in range(count):
-                            self.log.info(f"\nGenerating pattern {i+1} of {count}")
+                            self.log.info(f"\nCreating piece {i+1} of {count}")
                             self.run_iteration()
-                        input("\nGeneration complete. Press Enter to continue...")
+                        input("\nCreation complete. Press Enter to continue...")
                 except ValueError:
                     print("Please enter a valid number")
             elif choice == "3":
                 try:
-                    interval = int(input("Enter interval between generations in seconds: "))
+                    interval = int(input("Enter interval between creations in seconds: "))
                     if interval <= 0:
                         print("Interval must be greater than 0 seconds")
                         continue
@@ -136,61 +199,40 @@ Top Technique Combinations:""")
                 except ValueError:
                     print("Please enter a valid number")
             elif choice == "4":
-                self._show_model_selection_menu()
+                self._show_creation_flow()
+                break
             elif choice == "5":
                 break
             else:
                 print("\nInvalid choice. Please try again.")
     
-    def _show_model_selection_menu(self):
-        """Show model selection menu"""
-        while True:
-            self.log.title("MODEL SELECTION")
-            print("\nAvailable Models:")
-            print("1. Random")
-            print("2. O1")
-            print("3. O1-mini")
-            print("4. 4O")
-            print("5. Claude 3.5 Sonnet")
-            print("6. Claude 3 Opus")
-            print("7. Flux")
-            print("8. Back to Generation Menu")
-            
-            current_model = self.config.model_config['model_selection']
-            print(f"\nCurrent Model: {current_model}")
-            
-            choice = input("\nEnter your choice (1-8): ")
-            
-            model_map = {
-                "1": "random",
-                "2": "o1",
-                "3": "o1-mini",
-                "4": "4o",
-                "5": "claude-3.5-sonnet",
-                "6": "claude-3-opus",
-                "7": "flux"
-            }
-            
-            if choice in model_map:
-                self.config.set_model_selection(model_map[choice])
-                print(f"\nModel set to: {model_map[choice]}")
-                input("Press Enter to continue...")
-                return True  # Return to generation menu
-            elif choice == "8":
-                return True  # Return to generation menu
-            else:
-                print("\nInvalid choice. Please try again.")
-    
-    def run_continuous(self, interval: int = 600):
-        """Run continuous generation with specified interval"""
+    def run_continuous(self, interval: int):
+        """Run continuous pattern generation with specified interval"""
         self.log.info(f"Starting continuous automation (interval: {interval}s)...")
+        
         try:
             while True:
-                self.run_iteration()
+                print("\n" + "═" * 80)
+                print("║ NEW ITERATION")
+                print("═" * 80)
+                
+                # Generate creative approach
+                techniques = self._select_random_techniques()
+                technique_names = [t.name for t in techniques]
+                self.log.info(f"Creative approach: {', '.join(technique_names)}")
+                
+                # Generate pattern using appropriate generator
+                if self.selected_model == "flux":
+                    self.flux_generator.generate_with_ai(",".join(technique_names))
+                else:
+                    self._generate_pattern(techniques, self.generator)
+                
                 self.log.info(f"Waiting {interval} seconds until next generation...")
                 time.sleep(interval)
+                
         except KeyboardInterrupt:
-            self.log.warning("Stopping automation...")
+            self.log.info("Continuous generation stopped by user")
+            return
     
     def run_iteration(self):
         """Run one complete iteration"""
@@ -210,60 +252,46 @@ Top Technique Combinations:""")
             current_model = self.config.model_config['model_selection']
             self.log.info(f"Using model: {current_model}")
             
-            # For Flux model, let user select variant
+            # For Flux model, initialize if needed
             if current_model == "flux":
-                print("\nSelect Flux model variant:")
-                variants = self.config.static_image_config['models']['flux']['variants']
-                for i, (name, info) in enumerate(variants.items(), 1):
-                    print(f"{i}. {name.upper()} - {info['description']}")
+                if self.flux_generator is None:
+                    self.flux_generator = FluxGenerator(self.config, self.log)
+                self.flux_generator.generate_with_ai(",".join(technique_names))
+            else:
+                # Generate code and run sketch
+                next_version = self.config.get_next_version()
+                new_code = self.generator.generate_new_iteration(techniques, next_version)
+                if not new_code:
+                    self.log.error("Failed to generate code")
+                    return
                 
-                while True:
-                    try:
-                        choice = input("\nEnter choice (1-3): ").strip()
-                        if not choice.isdigit() or not (1 <= int(choice) <= 3):
-                            print("Please enter a number between 1 and 3")
-                            continue
-                        variant_names = list(variants.keys())
-                        selected_variant = variant_names[int(choice)-1]
-                        self.config.static_image_config['models']['flux']['selected_variant'] = selected_variant
-                        break
-                    except (ValueError, IndexError):
-                        print("Invalid selection, please try again")
-            
-            # Generate code and run sketch
-            next_version = self.config.get_next_version()
-            new_code = self.generator.generate_new_iteration(techniques, next_version)
-            if not new_code:
-                self.log.error("Failed to generate code")
-                return
-            
-            # Create and score pattern with string technique names
-            pattern = Pattern(
-                version=next_version,
-                code=new_code,
-                timestamp=datetime.now(),
-                techniques=technique_names  # Use converted strings
-            )
-            
-            # Score pattern
-            scores = self.generator.score_pattern(pattern)
-            pattern.update_scores(scores)
-            
-            # Save pattern
-            self.db.save_pattern(pattern)
-            
-            # Display scores
-            self.log.pattern_score(pattern.score)
-            self.log.info(f"Innovation: {pattern.innovation_score:.2f}, "
-                         f"Aesthetic: {pattern.aesthetic_score:.2f}, "
-                         f"Complexity: {pattern.mathematical_complexity:.2f}")
-            
-            # Evolve techniques
-            for technique in techniques:
-                self.evolution.evolve_technique(technique, pattern.get_metrics())
-            
-            # Update documentation
-            self.docs.update(pattern)
+                # Create and score pattern with string technique names
+                pattern = Pattern(
+                    version=next_version,
+                    code=new_code,
+                    timestamp=datetime.now(),
+                    techniques=technique_names  # Use converted strings
+                )
+                
+                # Score pattern
+                scores = self.generator.score_pattern(pattern)
+                pattern.update_scores(scores)
+                
+                # Save pattern
+                self.db.save_pattern(pattern)
+                
+                # Display scores
+                self.log.pattern_score(pattern.score)
+                self.log.info(f"Innovation: {pattern.innovation_score:.2f}, "
+                             f"Aesthetic: {pattern.aesthetic_score:.2f}, "
+                             f"Complexity: {pattern.mathematical_complexity:.2f}")
+                
+                # Evolve techniques
+                for technique in techniques:
+                    self.evolution.evolve_technique(technique, pattern.get_metrics())
+                
+                # Update documentation
+                self.docs.update(pattern)
             
         except Exception as e:
             self.log.error(f"Error in iteration: {e}")
@@ -401,7 +429,69 @@ Top Technique Combinations:""")
         self.log.debug(f"Debug mode: {self.debug_mode}")
         self.log.debug("==================\n")
 
+    def _select_model(self):
+        """Show model selection menu and handle choice"""
+        print("\n" + "═" * 80)
+        print("║ SELECT CREATIVE MODEL")
+        print("═" * 80 + "\n")
+        
+        print("Available Models:")
+        print("1. Random")
+        print("2. O1")
+        print("3. O1-mini")
+        print("4. 4O")
+        print("5. Claude 3.5 Sonnet")
+        print("6. Claude 3 Opus")
+        print("7. Flux (Static artwork)")
+        print("8. Back to Main Menu")
+        
+        while True:
+            try:
+                choice = input("\nEnter your choice (1-8): ").strip()
+                
+                if choice == "8":
+                    return False
+                
+                if not choice.isdigit() or not (1 <= int(choice) <= 7):
+                    print("Please enter a number between 1 and 8")
+                    continue
+                
+                model_map = {
+                    "1": "random",
+                    "2": "o1",
+                    "3": "o1-mini",
+                    "4": "4o",
+                    "5": "claude-3.5-sonnet",
+                    "6": "claude-3-opus",
+                    "7": "flux"
+                }
+                
+                self.selected_model = model_map[choice]
+                self.config.model_config['model_selection'] = self.selected_model
+                
+                # Initialize the appropriate generator
+                if self.selected_model == "flux":
+                    if self.generator is None:
+                        self.generator = FluxGenerator(self.config, self.log)
+                
+                return True
+                
+            except ValueError:
+                print("\nInvalid choice. Please try again.")
+
+    def _select_random_techniques(self) -> List[Pattern]:
+        """Select random techniques for generation"""
+        return self.evolution.select_techniques()
+
+    def _get_generator(self):
+        """Get the appropriate generator based on selected model"""
+        if self.config.model_config['model_selection'] == "flux":
+            if not hasattr(self, 'flux_generator'):
+                self.flux_generator = FluxGenerator(self.config, self.log)
+            return self.flux_generator
+        return self.generator
+
 if __name__ == "__main__":
-    config = Config()
-    prism = PRISM(config)
+    # Initialize without passing config
+    prism = PRISM()
     prism.show_menu()

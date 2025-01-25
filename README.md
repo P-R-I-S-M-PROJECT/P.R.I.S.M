@@ -9,12 +9,12 @@
   </p>
 </div>
 
-# PRISM - Pattern Recognition & Interactive Sketch Machine
+# PRISM - Pattern Recognition & Interactive Studio Machine
 
-PRISM is an AI-driven creative system that generates sophisticated geometric animations using Processing and static images using FAL API. It functions as an interactive art studio with evolutionary memory, treating each creation as a data point in a living system.
+PRISM is an AI-powered creative studio agent that generates both dynamic animated artworks and static visual pieces. It functions as an autonomous creative partner, learning and evolving from each artistic creation while maintaining a comprehensive understanding of its creative journey.
 
 <div align="center">
-  <h3>🎨 Animations • 🖼️ Static Images • 🧬 Evolution • 📊 Analysis</h3>
+  <h3>🎨 Dynamic Art • 🖼️ Visual Pieces • 🧬 Creative Evolution • 📊 Artistic Analysis</h3>
 </div>
 
 ## 🚀 Quick Start
@@ -40,10 +40,10 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
 
 ## 🎯 Core Features
 
-- **🤖 Multi-Model AI Generation**: OpenAI, Anthropic & FAL for diverse creative output
-- **🧬 Evolution System**: Adaptive generation based on performance
-- **📊 Analysis Pipeline**: Comprehensive evaluation of visual and technical aspects
-- **📝 Auto-Documentation**: AI-powered insights about patterns and techniques
+- **🤖 Multi-Model Creative Suite**: OpenAI, Anthropic & FAL models working in harmony
+- **🧬 Artistic Evolution**: Adaptive creation based on artistic success
+- **📊 Creative Analysis**: Deep evaluation of visual and technical elements
+- **📝 Studio Documentation**: AI-powered insights about artistic development
 
 ## 💻 Technical Requirements
 
@@ -51,106 +51,106 @@ PRISM is an AI-driven creative system that generates sophisticated geometric ani
 - Processing 4.0+ (must be installed at "C:\Program Files\processing-4.3\processing-java.exe")
 - PowerShell 7+ (Windows)
 - FFmpeg (Download from https://ffmpeg.org/download.html and place ffmpeg.exe in the scripts/ directory)
-- FAL API key for static image generation
+- FAL API key for static artwork creation
 
-## 📁 Project Structure
+## 📁 Studio Structure
 
 ```
 prism/
-├── data/           # Database and metadata storage
+├── data/           # Creative database and metadata
 ├── models/         # AI model integrations
-├── renders/        # Generated animations/images and metadata
-│   └── snapshots/  # Archived sketch files
+├── renders/        # Generated pieces and metadata
+│   └── snapshots/    # Historical artwork files
 └── scripts/        # Contains run_sketches.ps1 and ffmpeg.exe
 ```
 
-## 🎮 Interactive Menu System
+## 🎮 Creative Interface
 
-PRISM provides an intuitive menu system:
+PRISM provides an intuitive creative interface:
 
-### 1. Generate Patterns
-- Single Pattern Generation
-- Multiple Pattern Generation
-- Continuous Generation
+### 1. Create Art
+- Single Piece Creation
+- Multi-Piece Sessions
+- Continuous Studio Operation
 - Model Selection
-- Static Image Generation
+- Static Visual Art
 
-### 2. Model Selection
-- Random (Equal Weights)
+### 2. Creative Models
+- Random (Equal Representation)
 - OpenAI (O1, O1-mini, 4O)
 - Claude (3.5 Sonnet, 3 Opus)
-- Flux (Static Images)
+- Flux (Static Visuals)
 
-### 3. System Tools
-- Cleanup System
-- Toggle Debug Mode
-- Model Testing Suite
+### 3. Studio Tools
+- Studio Organization
+- Debug Mode
+- Model Experimentation
 
-## 🏗️ System Architecture
+## 🏗️ Studio Architecture
 
 ### Core Components
 ```
-├── prism.py              # Main orchestration
-├── code_generator.py     # Pattern generation engine
-├── pattern_analyzer.py   # Frame analysis system
-├── pattern_evolution.py  # Technique evolution
-├── tests.py             # Model testing framework
+├── prism.py              # Studio orchestration
+├── code_generator.py     # Dynamic art engine
+├── pattern_analyzer.py   # Visual analysis system
+├── pattern_evolution.py # Artistic evolution
+├── tests.py             # Model experimentation
 ├── models/              
-│   ├── openai_o1.py     # O1 model integration
-│   ├── openai_4o.py     # 4O model integration
-│   ├── claude_generator.py  # Claude integration
+│   ├── openai_o1.py     # O1 integration
+│   ├── openai_4o.py     # 4O integration
+│   ├── claude_studio.py # Claude integration
 │   └── flux.py          # FAL Flux integration
 ```
 
-## 🔄 Pipeline Overview
+## 🔄 Creative Pipeline
 
-1. **🎯 Technique Selection**
-   - Historical performance analysis
-   - Success rate weighting
-   - Innovation factors
-   - Synergy calculations
+1. **🎯 Artistic Approach**
+   - Historical analysis
+   - Success evaluation
+   - Innovation exploration
+   - Style synergy
 
-2. **🤖 Generation**
-   - Multi-model approach
-   - Code or image generation
-   - Validation and error handling
+2. **🤖 Creation**
+   - Multi-model creativity
+   - Dynamic generation
    - Quality assurance
+   - Error resilience
 
-3. **🎨 Rendering**
+3. **🎨 Realization**
    - Processing animations
-   - Static image generation
-   - Metadata handling
-   - Analysis integration
+   - Static visual art
+   - Metadata integration
+   - Analysis pipeline
 
-4. **📊 Analysis**
-   - Visual complexity
+4. **📊 Evaluation**
+   - Visual composition
    - Motion quality
-   - Aesthetic evaluation
+   - Aesthetic assessment
    - Performance metrics
 
 5. **🧬 Evolution**
-   - Pattern adaptation
-   - Technique refinement
-   - Style consistency
-   - Performance tracking
+   - Style adaptation
+   - Technique development
+   - Creative consistency
+   - Performance learning
 
-## 🧪 Testing Framework
+## 🧪 Studio Experiments
 
-Comprehensive testing modes for all models:
+Comprehensive testing for all creative models:
 
-1. **O1 Test Mode**
-   - Isolated testing
-   - Performance tracking
-   - Error analysis
+1. **O1 Studio Mode**
+   - Focused creation
+   - Performance analysis
+   - Error study
 
-2. **Claude Test Mode**
-   - Model comparison
-   - Generation pipeline
-   - Quality assessment
+2. **Claude Studio Mode**
+   - Model exploration
+   - Creation pipeline
+   - Quality evaluation
 
-3. **Flux Test Mode**
-   - Image generation
-   - Style evaluation
+3. **Flux Studio Mode**
+   - Visual art creation
+   - Style development
    - Quality metrics
 
 ## 📄 License

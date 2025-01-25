@@ -2,161 +2,159 @@
 
 ## Core Architecture
 
-PRISM is built on a multi-model AI architecture that leverages both OpenAI and Anthropic models for creative code generation, as well as FAL's Flux model for static image generation. The system employs an evolutionary approach to pattern generation, continuously learning from past successes and failures.
+PRISM is an automated art studio agent powered by a multi-model AI architecture. It leverages OpenAI and Anthropic models for creative code-based art generation, alongside FAL's Flux model for static visual art. The system functions as an evolving creative entity, learning from its artistic journey and adapting its approach based on experience.
 
-## Interactive System
+## Interactive Studio Interface
 
-The system provides a comprehensive menu-driven interface:
+The system provides an intuitive studio interface:
 
-1. **Pattern Generation**
-   - Single pattern generation with immediate feedback
-   - Batch generation of multiple patterns
-   - Continuous generation with custom intervals
-   - Direct model selection for targeted experiments
-   - Static image generation with Flux AI
+1. **Art Creation**
+   - Single piece creation with immediate feedback
+   - Multi-piece creative sessions
+   - Continuous studio operation
+   - Model selection for different artistic approaches
+   - Static artwork creation with Flux AI
 
-2. **Model Selection**
-   - Random mode with equal model weights
-   - Direct model selection for focused testing
-   - Seamless switching between models
-   - Model-specific performance tracking
+2. **Creative Models**
+   - Adaptive model selection
+   - Direct model choice for focused work
+   - Seamless creative flow
+   - Performance tracking per model
 
-3. **System Management**
-   - Pattern cleanup and archival
-   - Debug mode for detailed logging
-   - Dedicated model testing modes
-   - Performance metrics and statistics
+3. **Studio Management**
+   - Artwork organization and archival
+   - Debug mode for process insight
+   - Model experimentation suite
+   - Creative metrics and analytics
 
 ## AI Models
 
-The system integrates multiple AI models with different strengths:
+The studio integrates multiple AI models, each bringing unique creative capabilities:
 
 1. **OpenAI Models**
-   - O1
-   - O1-mini
-   - 4O
+   - O1: Balanced creation
+   - O1-mini: Rapid iteration
+   - 4O: Advanced generation
 
 2. **Anthropic Models**
-   - Claude 3.5 Sonnet
-   - Claude 3 Opus
+   - Claude 3.5 Sonnet: Nuanced creation
+   - Claude 3 Opus: Complex artworks
 
 3. **FAL Models**
-   - Flux.1 [dev] for static image generation
+   - Flux.1 [dev] for static visual art
 
-Each model is weighted equally (16.67%) in random selection mode.
+Each model contributes equally to the creative process with 16.67% representation in random selection mode.
 
-## Generation Pipeline
+## Creative Pipeline
 
-1. **Technique Selection**
-   - Analyzes historical performance data
-   - Weights techniques based on success rates
-   - Considers innovation potential
-   - Calculates synergy between techniques
+1. **Artistic Approach**
+   - Analyzes historical performance
+   - Adapts techniques based on success
+   - Explores innovative combinations
+   - Develops artistic synergies
 
 2. **Model Selection**
-   - User-selected or random based on configuration
-   - Each model has equal probability in random mode
-   - Models can be tested individually
-   - Specialized handling for static image generation
+   - Artist-directed or adaptive selection
+   - Equal representation in random mode
+   - Focused experimentation options
+   - Specialized visual art handling
 
-3. **Code/Image Generation**
-   - Selected model generates Processing code or static image
-   - Code/image is validated and sanitized
-   - Syntax is converted if needed
-   - Error recovery mechanisms in place
+3. **Art Generation**
+   - Dynamic code-based artwork
+   - Static visual pieces
+   - Quality assurance
+   - Error recovery systems
 
-4. **Rendering**
-   - Processing sketch compilation (`prism.pde`) for code
-   - Static image generation with Flux AI
-   - Local storage with metadata
-   - Comprehensive analysis and evolution tracking
+4. **Creation Process**
+   - Processing-based animation
+   - Flux AI static artwork
+   - Comprehensive metadata
+   - Evolution tracking
 
 ## Analysis System
 
-The analysis pipeline evaluates patterns across multiple dimensions:
+The studio evaluates artwork across multiple dimensions:
 
-1. **Visual Complexity**
-   - Edge detection analysis
-   - Color distribution metrics
-   - Pattern density calculations
-   - Image-specific metrics for static generations
+1. **Visual Analysis**
+   - Compositional structure
+   - Color relationships
+   - Visual density
+   - Image-specific qualities
 
-2. **Motion Quality**
-   - Frame-to-frame difference analysis
-   - Motion smoothness metrics
-   - Loop seamlessness check
-   - Static composition analysis for images
+2. **Motion Studies**
+   - Movement flow analysis
+   - Animation smoothness
+   - Loop integration
+   - Static composition
 
-3. **Aesthetic Quality**
-   - Composition balance
+3. **Aesthetic Evaluation**
+   - Compositional balance
    - Color harmony
-   - Visual interest metrics
-   - Style consistency evaluation
+   - Visual engagement
+   - Style consistency
 
 ## Testing Framework
 
-The system includes dedicated test modes for thorough model evaluation:
+The studio includes comprehensive model evaluation:
 
-1. **O1 Test Mode**
-   - Isolates GPT-3.5 model for testing
-   - Generates and scores patterns
-   - Tracks performance metrics
-   - Interactive continuation
+1. **O1 Studio Mode**
+   - Focused experimentation
+   - Performance analysis
+   - Error study
+   - Iterative improvement
 
-2. **Claude Test Mode**
-   - Choice between Sonnet and Opus models
-   - Full pattern generation pipeline
-   - Comprehensive scoring
-   - Interactive testing session
+2. **Claude Studio Mode**
+   - Model comparison
+   - Creation pipeline testing
+   - Quality assessment
+   - Interactive sessions
 
-3. **Flux Test Mode**
-   - Static image generation testing
-   - Creative prompt evaluation
-   - Image quality assessment
-   - Style consistency checking
-
-Test modes are accessible through the main menu and provide detailed feedback on each generation.
+3. **Flux Studio Mode**
+   - Visual art creation
+   - Style development
+   - Quality metrics
+   - Aesthetic consistency
 
 ## Evolution System
 
-The evolution system adapts based on:
+The studio evolves through:
 
-1. **Performance Tracking**
-   - Success rate per technique
-   - Model performance metrics
-   - Pattern scores history
-   - Image generation metrics
+1. **Performance Learning**
+   - Success rate analysis
+   - Model effectiveness
+   - Artwork scoring
+   - Creation metrics
 
-2. **Technique Evolution**
-   - Synergy calculations
-   - Weight adjustments
-   - Innovation boosting
-   - Style adaptation
+2. **Creative Evolution**
+   - Style development
+   - Technique refinement
+   - Innovation exploration
+   - Aesthetic adaptation
 
-3. **Pattern Lineage**
-   - Version tracking
-   - Technique inheritance
-   - Score progression
-   - Style consistency
+3. **Artistic Lineage**
+   - Version documentation
+   - Style inheritance
+   - Quality progression
+   - Creative consistency
 
 ## Documentation
 
-The system maintains comprehensive documentation:
+The studio maintains detailed records:
 
-1. **Pattern Records**
+1. **Artwork Archive**
    - Version history
-   - Technique combinations
+   - Creative approaches
    - Performance metrics
-   - Generated code/images
+   - Generated pieces
 
-2. **System Stats**
-   - Model usage statistics
-   - Average scores
-   - Success rates
-   - Innovation metrics
+2. **Studio Analytics**
+   - Model utilization
+   - Success metrics
+   - Innovation tracking
+   - Style development
 
-3. **Technical Logs**
-   - Generation process
+3. **Technical Records**
+   - Creation process logs
    - Error tracking
    - Performance monitoring
    - System health
