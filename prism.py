@@ -128,9 +128,9 @@ Top Technique Combinations:""")
                     print("Please enter a valid number")
             elif choice == "3":
                 try:
-                    interval = int(input("Enter interval between generations in seconds (min 60): "))
-                    if interval < 60:
-                        print("Interval must be at least 60 seconds")
+                    interval = int(input("Enter interval between generations in seconds: "))
+                    if interval <= 0:
+                        print("Interval must be greater than 0 seconds")
                         continue
                     self.run_continuous(interval)
                 except ValueError:

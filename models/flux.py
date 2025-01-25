@@ -57,6 +57,7 @@ class FluxGenerator:
         self.current_innovation = 0.5
         self.selected_size = None
         self.selected_model = None
+        self.model_selected = False  # Add flag to track if model has been selected
         
         # Initialize analysis and evolution systems
         self.analyzer = PatternAnalyzer(config)
@@ -72,10 +73,33 @@ class FluxGenerator:
 
     def _select_model_and_size(self):
         """Prompt user to select image size and use the selected Flux variant"""
-        # Get the selected variant from config
-        selected_variant = self.config.static_image_config['models']['flux'].get('selected_variant', 'pro')
-        self.selected_model = FluxModel[selected_variant.upper()]
+        # Only prompt for model selection if not already selected
+        if not self.model_selected:
+            print("\nSelect Flux model variant:")
+            variants = self.config.static_image_config['models']['flux']['variants']
+            for i, (name, info) in enumerate(variants.items(), 1):
+                print(f"{i}. {name.upper()} - {info['description']}")
+            
+            while True:
+                try:
+                    choice = input("\nEnter choice (1-3): ").strip()
+                    if not choice.isdigit() or not (1 <= int(choice) <= 3):
+                        print("Please enter a number between 1 and 3")
+                        continue
+                    variant_names = list(variants.keys())
+                    selected_variant = variant_names[int(choice)-1]
+                    self.config.static_image_config['models']['flux']['selected_variant'] = selected_variant
+                    self.selected_model = FluxModel[selected_variant.upper()]
+                    self.model_selected = True  # Set flag to indicate model has been selected
+                    break
+                except (ValueError, IndexError):
+                    print("Invalid selection, please try again")
+        else:
+            # Reuse previously selected variant
+            selected_variant = self.config.static_image_config['models']['flux'].get('selected_variant', 'pro')
+            self.selected_model = FluxModel[selected_variant.upper()]
         
+        # Always prompt for image size if not selected
         if self.selected_size is None:
             print("\nSelect image size:")
             sizes = list(ImageSize)
@@ -132,6 +156,23 @@ class FluxGenerator:
             print(f"Model: {self.selected_model.name} - {FluxModel.get_description(self.selected_model)}")
             print(f"Size: {self.selected_size.name}")
             print(f"Prompt: {creative_prompt}")
+
+            # Create metadata before generation
+            metadata = {
+                "version": version,
+                "timestamp": datetime.now().isoformat(),
+                "model": self.selected_model.name,
+                "image_size": self.selected_size.name,
+                "prompt": creative_prompt,
+                "techniques": [t.name for t in techniques],
+                "parameters": {
+                    "complexity": self.current_complexity,
+                    "innovation": self.current_innovation,
+                    "guidance_scale": flux_config.guidance_scale,
+                    "num_inference_steps": flux_config.num_inference_steps
+                },
+                "parent_patterns": [p.version for p in recent_patterns] if recent_patterns else []
+            }
 
             # Adjust inference steps based on model
             if self.selected_model == FluxModel.SCHNELL:
@@ -199,6 +240,34 @@ class FluxGenerator:
                 # Analyze pattern with render path
                 metrics = self.analyzer.analyze_pattern(pattern, render_path)
                 pattern.update_scores(metrics)
+                
+                # Update metadata with analysis results
+                metadata["analysis"] = {
+                    "overall_score": pattern.score,
+                    "aesthetic_score": pattern.aesthetic_score,
+                    "complexity_score": pattern.mathematical_complexity,
+                    "innovation_score": pattern.innovation_score,
+                    "coherence_score": pattern.visual_coherence,
+                    "synergy_score": pattern.technique_synergy
+                }
+                
+                # Run PowerShell script with metadata
+                import subprocess
+                import json
+                
+                script_path = self.config.base_path / "scripts" / "run_sketches.ps1"
+                metadata_json = json.dumps(metadata)
+                
+                cmd = [
+                    "powershell.exe",
+                    "-ExecutionPolicy", "Bypass",
+                    "-File", str(script_path),
+                    "-RenderPath", str(render_path),
+                    "-Metadata", metadata_json,
+                    "-Mode", "flux"
+                ]
+                
+                subprocess.run(cmd, check=True)
                 
                 # Evolve techniques based on performance
                 evolved_techniques = []
