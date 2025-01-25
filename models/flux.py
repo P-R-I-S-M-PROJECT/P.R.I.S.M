@@ -14,6 +14,9 @@ from pattern_analyzer import PatternAnalyzer
 from pattern_evolution import PatternEvolution
 from database_manager import DatabaseManager
 import random
+import json
+import openai
+import subprocess
 
 class FluxModel(Enum):
     SCHNELL = "fal-ai/flux/schnell"  # Turbo mode
@@ -159,7 +162,7 @@ class FluxGenerator:
                 except (ValueError, IndexError):
                     print("Invalid selection, please try again")
 
-    def generate_with_ai(self, prompt: str) -> Optional[str]:
+    def generate_with_ai(self, prompt: str, **kwargs) -> bool:
         """Generate image using Flux AI with PRISM integration"""
         try:
             version = self.config.get_next_version()
@@ -241,7 +244,7 @@ class FluxGenerator:
             
             if not result or "images" not in result:
                 self.log.error("Failed to generate image")
-                return None
+                return False
             
             try:
                 render_path = self.config.base_path / "renders" / f"render_v{version}"
@@ -263,7 +266,7 @@ class FluxGenerator:
                             f.write(image_response.content)
                     else:
                         self.log.error("Failed to download image")
-                        return None
+                        return False
                 
                 print(f"\nImage saved to: {image_path}")
                 
@@ -291,9 +294,6 @@ class FluxGenerator:
                 }
                 
                 # Run PowerShell script with metadata
-                import subprocess
-                import json
-                
                 script_path = self.config.base_path / "scripts" / "run_sketches.ps1"
                 metadata_json = json.dumps(metadata)
                 
@@ -328,15 +328,15 @@ class FluxGenerator:
                 stats = self.db.get_system_stats()
                 self.log.info(f"System Stats: {stats}")
                 
-                return "Image generated successfully"
+                return True
                 
             except Exception as e:
                 self.log.error(f"Error saving image: {str(e)}")
-                return None
+                return False
             
         except Exception as e:
             self.log.error(f"Error in Flux generation: {str(e)}")
-            return None
+            return False
     
     def _adjust_parameters(self, techniques: List[Technique], stats: Dict, synergy_pairs: List[tuple]) -> None:
         """Adjust generation parameters based on historical performance"""
@@ -394,8 +394,7 @@ class FluxGenerator:
         """Convert PRISM techniques into a creative prompt for Flux using OpenAI 4O"""
         try:
             # Initialize OpenAI 4O client
-            from openai import OpenAI
-            client = OpenAI(api_key=self.config.openai_key)
+            client = openai.OpenAI(api_key=self.config.openai_key)
             
             # Map techniques to categories
             categories = {
@@ -592,4 +591,109 @@ Make it unique and visually compelling."""
             return fal_client.upload_file(file_path)
         except Exception as e:
             self.log.error(f"Error uploading file: {str(e)}")
-            return None 
+            return None
+    
+    def create_variation(self, metadata_file: Path) -> bool:
+        """Create variation of a static Flux piece"""
+        try:
+            # Initialize required attributes if not set
+            if not hasattr(self, 'current_complexity'):
+                self.current_complexity = 0.7
+            if not hasattr(self, 'current_innovation'):
+                self.current_innovation = 0.5
+            if not hasattr(self, 'selected_model'):
+                self.selected_model = FluxModel.PRO
+            if not hasattr(self, 'selected_size'):
+                self.selected_size = ImageSize.SQUARE_HD
+            if not hasattr(self, 'variant_selected'):
+                self.variant_selected = True
+            if not hasattr(self, 'analyzer'):
+                self.analyzer = PatternAnalyzer(self.config, self.log)
+            if not hasattr(self, 'db'):
+                self.db = DatabaseManager(self.config)
+            
+            # Load original metadata with utf-8-sig encoding to handle BOM
+            with open(metadata_file, 'r', encoding='utf-8-sig') as f:
+                content = f.read().strip()
+                if not content:
+                    self.log.error("Empty metadata file")
+                    return False
+                metadata = json.loads(content)
+            
+            # Display original prompt and metadata
+            self.log.info("\nOriginal Creation:")
+            self.log.info(f"Prompt: {metadata['prompt']}")
+            if 'techniques' in metadata:
+                self.log.info(f"Techniques: {', '.join(metadata['techniques'])}")
+            if 'model' in metadata:
+                self.log.info(f"Model: {metadata['model']}")
+            
+            # Get variation instructions
+            print("\nEnter your variation instructions (e.g. 'make it more abstract' or 'add subtle PRISM text')")
+            print("Or press Enter to keep original prompt and adjust interactively")
+            variation_instructions = input("> ").strip()
+            
+            # Build variation prompt
+            if variation_instructions:
+                system_prompt = f"""You are helping create a variation of an existing AI artwork.
+Original prompt: {metadata['prompt']}
+User wants these changes: {variation_instructions}
+
+Create a new prompt that maintains the core style and elements of the original,
+but incorporates the requested changes. Return only the new prompt text."""
+
+                # Get new prompt from OpenAI
+                client = openai.OpenAI(api_key=self.config.openai_key)
+                response = client.chat.completions.create(
+                    model="gpt-4o",  # Using the correct implemented model
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": "Generate the new prompt."}
+                    ],
+                    temperature=0.7
+                )
+                
+                new_prompt = response.choices[0].message.content.strip()
+            else:
+                new_prompt = metadata['prompt']
+            
+            # Show new prompt
+            self.log.info(f"\nNew prompt: {new_prompt}")
+            
+            # Set model and size from original metadata if available
+            if 'model' in metadata:
+                try:
+                    self.selected_model = FluxModel[metadata['model']]
+                except KeyError:
+                    pass  # Keep default if model not found
+            
+            if 'image_size' in metadata:
+                try:
+                    self.selected_size = ImageSize[metadata['image_size']]
+                except KeyError:
+                    pass  # Keep default if size not found
+            
+            # Generate variation with same parameters as original if available
+            params = metadata.get('parameters', {})
+            
+            # Generate the variation
+            return self.generate_with_ai(
+                new_prompt,
+                complexity=params.get('complexity', 0.7),
+                innovation=params.get('innovation', 0.5),
+                guidance_scale=params.get('guidance_scale', 4.5),
+                num_inference_steps=params.get('num_inference_steps', 28)
+            )
+            
+        except json.JSONDecodeError as je:
+            self.log.error(f"Error reading metadata file (JSON format error): {je}")
+            if hasattr(self.log, 'debug_mode') and self.log.debug_mode:
+                with open(metadata_file, 'r', encoding='utf-8-sig') as f:
+                    self.log.debug(f"File contents:\n{f.read()}")
+            return False
+        except Exception as e:
+            self.log.error(f"Error creating static variation: {e}")
+            if hasattr(self.log, 'debug_mode') and self.log.debug_mode:
+                import traceback
+                self.log.debug(traceback.format_exc())
+            return False 

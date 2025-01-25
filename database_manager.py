@@ -558,3 +558,38 @@ class DatabaseManager:
         except Exception as e:
             self.log.error(f"Error getting next version: {e}")
             return 1
+    
+    def get_pattern_by_version(self, version: int) -> Optional[Pattern]:
+        """Get pattern by version number"""
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT version, code, timestamp, techniques, score,
+                       innovation_score, aesthetic_score, mathematical_complexity,
+                       motion_quality, visual_coherence, technique_synergy,
+                       parent_patterns
+                FROM patterns 
+                WHERE version = ?
+            """, (version,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return None
+                
+            return Pattern(
+                version=row[0],
+                code=row[1],
+                timestamp=datetime.fromisoformat(row[2]),
+                techniques=json.loads(row[3]) if row[3] else [],
+                score=row[4],
+                innovation_score=row[5],
+                aesthetic_score=row[6],
+                mathematical_complexity=row[7],
+                motion_quality=row[8],
+                visual_coherence=row[9],
+                technique_synergy=row[10],
+                parent_patterns=json.loads(row[11]) if row[11] else []
+            )
+        finally:
+            conn.close()

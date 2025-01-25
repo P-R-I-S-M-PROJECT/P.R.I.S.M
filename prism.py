@@ -18,6 +18,8 @@ import json
 from typing import Dict, List
 import sys
 import random
+from pathlib import Path
+import openai
 
 # Load environment variables
 load_dotenv()
@@ -100,9 +102,10 @@ Top Technique Combinations:""")
             print("3. Toggle Debug Mode")
             print("4. Test O1 Models")
             print("5. Test Claude Models")
-            print("6. Exit")
+            print("6. Variation Mode")
+            print("7. Exit")
             
-            choice = input("\nEnter your choice (1-6): ")
+            choice = input("\nEnter your choice (1-7): ")
             
             if choice == "1":
                 self._show_creation_flow()
@@ -115,6 +118,8 @@ Top Technique Combinations:""")
             elif choice == "5":
                 self.test_runner.test_claude_models()
             elif choice == "6":
+                self._show_variation_flow()
+            elif choice == "7":
                 self.log.title("Exiting Studio")
                 break
             else:
@@ -490,6 +495,200 @@ Top Technique Combinations:""")
                 self.flux_generator = FluxGenerator(self.config, self.log)
             return self.flux_generator
         return self.generator
+
+    def _show_variation_flow(self):
+        """Show variation mode interface"""
+        self.log.title("VARIATION MODE")
+        
+        # Get list of render directories
+        render_path = self.config.base_path / "renders"
+        if not render_path.exists():
+            self.log.error("No existing renders found")
+            return
+            
+        # List available renders
+        renders = sorted([d for d in render_path.glob("render_v*") if d.is_dir()], 
+                        key=lambda x: int(str(x).split("_v")[-1]))
+        
+        if not renders:
+            self.log.error("No renders found to create variations from")
+            return
+            
+        print("\nAvailable pieces:")
+        for i, render in enumerate(renders, 1):
+            version = str(render).split("_v")[-1]
+            # Check for PNG files to determine if static
+            png_files = list(render.glob("*.png"))
+            if png_files:
+                # Try to get metadata - look for any json file matching pattern
+                json_files = list(render.glob(f"image_v{version}*.json"))
+                if json_files:
+                    print(f"{i}. render_v{version} (Static)")
+                else:
+                    print(f"{i}. render_v{version} (Static)")
+            else:
+                print(f"{i}. render_v{version} (Dynamic)")
+        
+        print(f"{len(renders) + 1}. Back to Main Menu")
+        
+        while True:
+            try:
+                choice = input("\nSelect piece to create variation from (1-{}): ".format(len(renders) + 1))
+                if not choice.isdigit():
+                    print("Please enter a number")
+                    continue
+                    
+                choice = int(choice)
+                if choice == len(renders) + 1:
+                    return
+                    
+                if 1 <= choice <= len(renders):
+                    selected_render = renders[choice - 1]
+                    version = str(selected_render).split("_v")[-1]
+                    
+                    # Check if static or dynamic by looking for PNG files
+                    png_files = list(selected_render.glob("*.png"))
+                    if png_files:
+                        # Find metadata file with timestamp
+                        json_files = list(selected_render.glob(f"image_v{version}*.json"))
+                        if json_files:
+                            self._create_static_variation(json_files[0])
+                        else:
+                            self.log.error("Metadata file not found for static image")
+                    else:
+                        self._create_dynamic_variation(selected_render)
+                    break
+                else:
+                    print("Invalid choice")
+            except ValueError:
+                print("Please enter a valid number")
+            except Exception as e:
+                self.log.error(f"Error in variation flow: {e}")
+                if self.debug_mode:
+                    import traceback
+                    self.log.debug(traceback.format_exc())
+                break
+
+    def _create_static_variation(self, metadata_file: Path):
+        """Create variation of a static Flux piece"""
+        try:
+            # Initialize Flux generator if needed
+            if not hasattr(self, 'flux_generator') or self.flux_generator is None:
+                from models.flux import FluxGenerator
+                self.flux_generator = FluxGenerator(self.config, self.log)
+            
+            # Delegate to FluxGenerator's create_variation method
+            self.flux_generator.create_variation(metadata_file)
+            
+        except Exception as e:
+            self.log.error(f"Error creating static variation: {e}")
+            if self.debug_mode:
+                import traceback
+                self.log.debug(traceback.format_exc())
+    
+    def _create_dynamic_variation(self, render_dir: Path):
+        """Create variation of a dynamic Processing piece"""
+        try:
+            version = str(render_dir).split("_v")[-1]
+            
+            # Try to find original PDE file
+            pde_file = render_dir / f"prism_v{version}.pde"
+            if not pde_file.exists():
+                pde_file = self.config.base_path / "prism.pde"
+            
+            if not pde_file.exists():
+                self.log.error("Could not find original PDE file")
+                return
+            
+            # Read original code
+            with open(pde_file) as f:
+                original_code = f.read()
+            
+            # Extract user code section
+            user_code_match = re.search(r"// === USER'S CREATIVE CODE ===\n(.*?)// END OF YOUR CREATIVE CODE", 
+                                      original_code, re.DOTALL)
+            if not user_code_match:
+                self.log.error("Could not extract user code section")
+                return
+                
+            user_code = user_code_match.group(1).strip()
+            
+            # Get pattern from database for techniques
+            pattern = self.db.get_pattern_by_version(int(version))
+            if pattern:
+                self.log.info(f"\nOriginal techniques: {', '.join(pattern.techniques)}")
+            
+            # Get variation instructions
+            print("\nEnter your variation instructions (e.g. 'use only squares instead of circles')")
+            print("Or press Enter to keep original code and adjust interactively")
+            variation_instructions = input("> ").strip()
+            
+            if variation_instructions:
+                # Build prompt for code variation
+                system_prompt = f"""You are helping create a variation of an existing Processing sketch.
+Here is the original creative code:
+
+{user_code}
+
+The user wants these changes: {variation_instructions}
+
+Create a new version that maintains the core style and functionality,
+but incorporates the requested changes. Return only the code that goes
+between the USER'S CREATIVE CODE markers."""
+
+                # Get new code from OpenAI
+                client = openai.OpenAI(api_key=self.config.openai_key)
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": "Generate the new code."}
+                    ],
+                    temperature=0.7
+                )
+                
+                new_code = response.choices[0].message.content.strip()
+                
+                # Validate new code
+                success, error = self.generator.validate_creative_code(new_code)
+                if not success:
+                    self.log.error(f"Generated code validation failed: {error}")
+                    return
+                
+                # Update template with new code
+                template = self.generator._build_template_with_config(self.config.get_next_version())
+                final_code = template.replace("// === USER'S CREATIVE CODE ===\n", 
+                                           f"// === USER'S CREATIVE CODE ===\n{new_code}\n")
+                
+                # Save and run new code
+                with open(self.config.paths['template'], 'w') as f:
+                    f.write(final_code)
+                
+                # Run the sketch
+                next_version = self.config.get_next_version()
+                render_path = f"renders/render_v{next_version}"
+                success = self._run_sketch(render_path)
+                
+                if success:
+                    # Create pattern with parent reference
+                    new_pattern = Pattern(
+                        version=next_version,
+                        code=new_code,
+                        timestamp=datetime.now(),
+                        techniques=pattern.techniques if pattern else [],
+                        parent_patterns=[int(version)]
+                    )
+                    
+                    # Score and save pattern
+                    scores = self.generator.score_pattern(new_pattern)
+                    new_pattern.update_scores(scores)
+                    self.db.save_pattern(new_pattern)
+                    
+                    # Update documentation
+                    self.docs.update(new_pattern)
+            
+        except Exception as e:
+            self.log.error(f"Error creating dynamic variation: {e}")
 
 if __name__ == "__main__":
     # Initialize without passing config
