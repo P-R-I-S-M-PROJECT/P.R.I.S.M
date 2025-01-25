@@ -194,10 +194,13 @@ class ProcessingGenerator:
                 if last_error:
                     self.log.debug(f"Previous error: {last_error}")
                     
-                generator = self.ai_generators[initial_model]  # Use initial model consistently
+                # Always use the initial model for consistency
+                generator = self.ai_generators[initial_model]
                 # Ensure the generator keeps using the same model
-                if hasattr(generator, 'current_model'):
-                    generator.current_model = initial_model
+                if hasattr(generator, '_select_o1_model'):
+                    generator._select_o1_model(initial_model)
+                elif hasattr(generator, '_select_claude_model'):
+                    generator._select_claude_model(initial_model)
                     
                 if generated_code := self._try_single_generation(generator, prompt, attempt, version):
                     return generated_code

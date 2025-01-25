@@ -24,7 +24,11 @@ class OpenAIO1Generator:
             self.current_model = model
             return self.model_ids[model]
             
-        # Default to o1-mini if not specified
+        # If no model specified and we have a current model, keep using it
+        if self.current_model in ['o1', 'o1-mini']:
+            return self.model_ids[self.current_model]
+        
+        # Only default to o1-mini if we have no current model
         self.current_model = 'o1-mini'
         return self.model_ids['o1-mini']
     
