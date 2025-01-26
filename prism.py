@@ -221,15 +221,14 @@ Top Technique Combinations:""")
                 print("║ NEW ITERATION")
                 print("═" * 80)
                 
-                # Generate creative approach
-                techniques = self._select_random_techniques()
-                technique_names = [t.name for t in techniques]
-                self.log.info(f"Creative approach: {', '.join(technique_names)}")
-                
-                # Generate pattern using appropriate generator
+                # For Flux model, use wizard
                 if self.selected_model == "flux":
-                    self.flux_generator.generate_with_ai(",".join(technique_names))
+                    self.flux_generator.generate_with_ai()  # No prompt - will trigger wizard
                 else:
+                    # Generate creative approach for other models
+                    techniques = self._select_random_techniques()
+                    technique_names = [t.name for t in techniques]
+                    self.log.info(f"Creative approach: {', '.join(technique_names)}")
                     self._generate_pattern(techniques, self.generator)
                 
                 self.log.info(f"Waiting {interval} seconds until next generation...")
@@ -243,7 +242,18 @@ Top Technique Combinations:""")
         """Run one complete iteration"""
         self.log.title("NEW ITERATION")
         try:
-            # Get creative direction
+            # Log which model we're using
+            current_model = self.config.model_config['model_selection']
+            self.log.info(f"Using model: {current_model}")
+            
+            # For Flux model, initialize if needed and use wizard
+            if current_model == "flux":
+                if self.flux_generator is None:
+                    self.flux_generator = FluxGenerator(self.config, self.log)
+                self.flux_generator.generate_with_ai()  # No prompt - will trigger wizard
+                return
+            
+            # For other models, get creative direction
             techniques = self.evolution.select_techniques()
             if not techniques:
                 self.log.error("Failed to select techniques")
@@ -253,50 +263,40 @@ Top Technique Combinations:""")
             technique_names = [str(t.name) for t in techniques]
             self.log.info(f"Creative approach: {technique_names}")
             
-            # Log which model we're using
-            current_model = self.config.model_config['model_selection']
-            self.log.info(f"Using model: {current_model}")
+            # Generate code and run sketch
+            next_version = self.config.get_next_version()
+            new_code = self.generator.generate_new_iteration(techniques, next_version)
+            if not new_code:
+                self.log.error("Failed to generate code")
+                return
             
-            # For Flux model, initialize if needed
-            if current_model == "flux":
-                if self.flux_generator is None:
-                    self.flux_generator = FluxGenerator(self.config, self.log)
-                self.flux_generator.generate_with_ai(",".join(technique_names))
-            else:
-                # Generate code and run sketch
-                next_version = self.config.get_next_version()
-                new_code = self.generator.generate_new_iteration(techniques, next_version)
-                if not new_code:
-                    self.log.error("Failed to generate code")
-                    return
-                
-                # Create and score pattern with string technique names
-                pattern = Pattern(
-                    version=next_version,
-                    code=new_code,
-                    timestamp=datetime.now(),
-                    techniques=technique_names  # Use converted strings
-                )
-                
-                # Score pattern
-                scores = self.generator.score_pattern(pattern)
-                pattern.update_scores(scores)
-                
-                # Save pattern
-                self.db.save_pattern(pattern)
-                
-                # Display scores
-                self.log.pattern_score(pattern.score)
-                self.log.info(f"Innovation: {pattern.innovation_score:.2f}, "
-                             f"Aesthetic: {pattern.aesthetic_score:.2f}, "
-                             f"Complexity: {pattern.mathematical_complexity:.2f}")
-                
-                # Evolve techniques
-                for technique in techniques:
-                    self.evolution.evolve_technique(technique, pattern.get_metrics())
-                
-                # Update documentation
-                self.docs.update(pattern)
+            # Create and score pattern with string technique names
+            pattern = Pattern(
+                version=next_version,
+                code=new_code,
+                timestamp=datetime.now(),
+                techniques=technique_names  # Use converted strings
+            )
+            
+            # Score pattern
+            scores = self.generator.score_pattern(pattern)
+            pattern.update_scores(scores)
+            
+            # Save pattern
+            self.db.save_pattern(pattern)
+            
+            # Display scores
+            self.log.pattern_score(pattern.score)
+            self.log.info(f"Innovation: {pattern.innovation_score:.2f}, "
+                         f"Aesthetic: {pattern.aesthetic_score:.2f}, "
+                         f"Complexity: {pattern.mathematical_complexity:.2f}")
+            
+            # Evolve techniques
+            for technique in techniques:
+                self.evolution.evolve_technique(technique, pattern.get_metrics())
+            
+            # Update documentation
+            self.docs.update(pattern)
             
         except Exception as e:
             self.log.error(f"Error in iteration: {e}")

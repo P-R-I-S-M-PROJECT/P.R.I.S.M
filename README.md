@@ -27,6 +27,8 @@ PRISM is an AI-powered creative studio agent that generates both dynamic animate
 - **🧬 Creative Evolution**: Self-improving system that learns from each creation
 - **📊 Deep Analysis**: Comprehensive evaluation of visual and technical elements
 - **📝 Studio Memory**: Maintains artistic lineage and creative development history
+- **🎲 Generation Modes**: Choose between guided wizard or random generation for static art
+- **🔍 Focused Prompts**: Streamlined prompt generation with clear, concise results
 
 ## 🚀 Quick Start
 
@@ -55,6 +57,11 @@ PRISM is an AI-powered creative studio agent that generates both dynamic animate
 - **🧬 Artistic Evolution**: Adaptive creation based on artistic success
 - **📊 Creative Analysis**: Deep evaluation of visual and technical elements
 - **📝 Studio Documentation**: AI-powered insights about artistic development
+- **🎨 Static Art Generation**: 
+  - Guided wizard for step-by-step prompt building
+  - Random mode for quick, AI-curated prompts
+  - Concise, focused prompts under 30 words
+  - Multiple variations with custom modifications
 
 ## 💻 Technical Requirements
 
@@ -85,7 +92,10 @@ PRISM provides an intuitive creative interface:
 - Artwork Variations
 - Continuous Studio Operation
 - Model Selection
-- Static Visual Art
+- Static Visual Art with:
+  - Guided Wizard Mode
+  - Random Generation Mode
+  - Concise Prompt Building
 
 ### 2. Variation Mode
 - Select any existing artwork
@@ -94,6 +104,7 @@ PRISM provides an intuitive creative interface:
 - Preserve artistic lineage
 - Maintain technique consistency
 - Explore creative possibilities
+- Create multiple variations at once
 
 ### 3. Creative Models
 - Random (Equal Representation)

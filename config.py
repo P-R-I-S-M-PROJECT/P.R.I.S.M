@@ -83,6 +83,12 @@ class Config:
                     'geometric', 'minimal', 'textural', 'atmospheric'
                 ]
             },
+            'categories': {
+                'subjects': [
+                    'Animal', 'Architecture', 'Character', 'Nature',
+                    'People', 'Science', 'Abstract', 'Landscape'
+                ]
+            },
             'creative_guidance': {
                 'conceptual_fusion': {
                     'description': 'How different artistic elements can blend',

@@ -162,55 +162,182 @@ class FluxGenerator:
                 except (ValueError, IndexError):
                     print("Invalid selection, please try again")
 
-    def generate_with_ai(self, prompt: str, **kwargs) -> bool:
-        """Generate image using Flux AI with PRISM integration"""
+    def _prompt_wizard(self) -> str:
+        """
+        Interactive prompt builder that guides users through creating a focused prompt.
+        """
+        print("\n════════════════════════════════════════════════════════════════════════════════")
+        print("║ PROMPT WIZARD")
+        print("════════════════════════════════════════════════════════════════════════════════\n")
+        
+        # Get categories from config
+        elements = self.config.static_image_config['prompt_elements']
+        
+        # 1. Subject Category
+        print("Pick a Subject Category:")
+        subjects = self.config.static_image_config['categories']['subjects']
+        for i, subject in enumerate(subjects, 1):
+            print(f"{i}. {subject}")
+        while True:
+            try:
+                choice = int(input("\nEnter choice (1-{}): ".format(len(subjects))))
+                if 1 <= choice <= len(subjects):
+                    subject = subjects[choice-1]
+                    break
+                print("Invalid choice")
+            except ValueError:
+                print("Please enter a number")
+        
+        # 2. Style
+        print("\nPick a Style:")
+        styles = elements['stylistic_approaches']
+        for i, style in enumerate(styles, 1):
+            print(f"{i}. {style}")
+        while True:
+            try:
+                choice = int(input("\nEnter choice (1-{}): ".format(len(styles))))
+                if 1 <= choice <= len(styles):
+                    style = styles[choice-1]
+                    break
+                print("Invalid choice")
+            except ValueError:
+                print("Please enter a number")
+        
+        # 3. Mood
+        print("\nPick a Mood:")
+        moods = elements['emotional_qualities']
+        for i, mood in enumerate(moods, 1):
+            print(f"{i}. {mood}")
+        while True:
+            try:
+                choice = int(input("\nEnter choice (1-{}): ".format(len(moods))))
+                if 1 <= choice <= len(moods):
+                    mood = moods[choice-1]
+                    break
+                print("Invalid choice")
+            except ValueError:
+                print("Please enter a number")
+        
+        # 4. Optional Details
+        print("\nAny additional details? (e.g. 'Include fractals', 'Add text PRISM')")
+        print("Press Enter to skip")
+        additional = input("> ").strip()
+        
+        # Build bullet points
+        bullet_points = f"""Subject: {subject}
+Style: {style}
+Mood: {mood}"""
+        if additional:
+            bullet_points += f"\nAdditional: {additional}"
+        
+        # Polish with GPT-4
         try:
-            version = self.config.get_next_version()
-            techniques = self._parse_techniques_from_prompt(prompt)
+            client = openai.OpenAI(api_key=self.config.openai_key)
+            system_prompt = """You are an AI assistant that merges bullet points into a single concise sentence for AI art generation.
+Keep it under 30 words.
+Be direct and clear.
+No flowery language or excessive detail.
+Return ONLY the final prompt."""
             
-            # Get historical context
-            recent_patterns = self.db.get_recent_patterns(3)
-            historical_techniques = self.db.get_historical_techniques(10)
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Create a short, focused prompt from:\n\n{bullet_points}"}
+                ],
+                temperature=0.7
+            )
             
-            # Calculate synergy and adjust parameters
-            synergy_pairs = self.db.get_synergy_pairs()
-            technique_stats = self.db.get_technique_stats()
+            return response.choices[0].message.content.strip()
             
-            # Adjust parameters based on historical performance
-            self._adjust_parameters(techniques, technique_stats, synergy_pairs)
-            
-            creative_prompt = self._build_creative_prompt(techniques)
+        except Exception as e:
+            self.log.error(f"Error in prompt wizard GPT step: {str(e)}")
+            # Fallback to simple combination
+            parts = [subject, style, mood]
+            if additional:
+                parts.append(additional)
+            return " | ".join(parts)
+
+    def generate_with_ai(self, prompt: str = "", **kwargs) -> bool:
+        """Generate image using Flux AI with user-guided prompt generation"""
+        try:
+            # If no prompt provided, ask for generation mode
+            if not prompt:
+                print("\nGeneration Mode:")
+                print("1. Guided Wizard (Step-by-step prompt building)")
+                print("2. Random (AI-selected techniques)")
+                
+                while True:
+                    try:
+                        choice = input("\nEnter choice (1-2): ").strip()
+                        if choice == "1":
+                            prompt = self._prompt_wizard()
+                            break
+                        elif choice == "2":
+                            # Get random techniques from evolution system
+                            elements = self.config.static_image_config['prompt_elements']
+                            subject = random.choice(self.config.static_image_config['categories']['subjects'])
+                            style = random.choice(elements['stylistic_approaches'])
+                            mood = random.choice(elements['emotional_qualities'])
+                            
+                            # Use GPT to create a cohesive prompt
+                            try:
+                                client = openai.OpenAI(api_key=self.config.openai_key)
+                                system_prompt = """You are an AI assistant that creates cohesive art prompts.
+Keep it under 30 words.
+Be direct and clear.
+No flowery language or excessive detail.
+Return ONLY the final prompt."""
+                                
+                                response = client.chat.completions.create(
+                                    model="gpt-4o",
+                                    messages=[
+                                        {"role": "system", "content": system_prompt},
+                                        {"role": "user", "content": f"Create a short, focused prompt combining:\nSubject: {subject}\nStyle: {style}\nMood: {mood}"}
+                                    ],
+                                    temperature=0.7
+                                )
+                                
+                                prompt = response.choices[0].message.content.strip()
+                                self.log.info(f"\nGenerated prompt: {prompt}")
+                                
+                            except Exception as e:
+                                self.log.error(f"Error in GPT prompt generation: {str(e)}")
+                                # Fallback to simple combination
+                                prompt = f"{subject} in {style} style with {mood} mood"
+                            break
+                        else:
+                            print("Please enter 1 or 2")
+                    except ValueError:
+                        print("Please enter a valid number")
             
             # Only select model and size if not already selected
             if not self.variant_selected or self.selected_size is None:
                 self._select_model_and_size()
-                # Save selections to config
-                self.config.static_image_config['models']['flux']['selected_variant'] = self.selected_model.name.lower()
-                self.config.static_image_config['models']['flux']['selected_size'] = self.selected_size.name
-                self.config.save_metadata()
-                self.log.debug(f"Saved variant {self.selected_model.name} and size {self.selected_size.name} to config")
-            else:
-                self.log.debug(f"Using saved variant {self.selected_model.name} and size {self.selected_size.name}")
             
+            # Show the final prompt
+            self.log.info(f"Final prompt: {prompt}")
+            
+            # Get next version and create render directory
+            version = self.config.get_next_version()
+            
+            # Get historical context
+            recent_patterns = self.db.get_recent_patterns(3)
+            
+            # Build Flux configuration
             flux_config = self._build_flux_config()
-            flux_config.image_size = self.selected_size
-            flux_config.model = self.selected_model
             
             # Set seed if provided
             if 'seed' in kwargs:
                 flux_config.seed = kwargs['seed']
             
-            # Always show the creative prompt
-            self.log.info(f"Creative prompt: {creative_prompt}")
-
-            # Create metadata before generation
+            # Create metadata
             metadata = {
                 "version": version,
                 "timestamp": datetime.now().isoformat(),
                 "model": self.selected_model.name,
                 "image_size": self.selected_size.name,
-                "prompt": creative_prompt,
-                "techniques": [t.name for t in techniques],
+                "prompt": prompt,
                 "parameters": {
                     "complexity": self.current_complexity,
                     "innovation": self.current_innovation,
@@ -223,7 +350,7 @@ class FluxGenerator:
 
             # Adjust inference steps based on model
             if self.selected_model == FluxModel.SCHNELL:
-                num_inference_steps = min(12, flux_config.num_inference_steps)  # Schnell has max 12 steps
+                num_inference_steps = min(12, flux_config.num_inference_steps)
             else:
                 num_inference_steps = flux_config.num_inference_steps
 
@@ -232,10 +359,11 @@ class FluxGenerator:
                     for log in update.logs:
                         print(f"Progress: {log['message']}")
             
+            # Generate the image
             result = fal_client.subscribe(
                 self.selected_model.value,
                 arguments={
-                    "prompt": creative_prompt,
+                    "prompt": prompt,
                     "image_size": self.selected_size.value,
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": flux_config.guidance_scale,
@@ -252,6 +380,7 @@ class FluxGenerator:
                 self.log.error("Failed to generate image")
                 return False
             
+            # Save the generated image
             try:
                 render_path = self.config.base_path / "renders" / f"render_v{version}"
                 render_path.mkdir(parents=True, exist_ok=True)
@@ -281,7 +410,7 @@ class FluxGenerator:
                     version=version,
                     code="",  # No code for image patterns
                     timestamp=datetime.now(),
-                    techniques=[t.name for t in techniques],
+                    techniques=[],  # No specific techniques for wizard-generated prompts
                     parent_patterns=[p.version for p in recent_patterns]
                 )
                 
@@ -313,19 +442,6 @@ class FluxGenerator:
                 ]
                 
                 subprocess.run(cmd, check=True)
-                
-                # Evolve techniques based on performance
-                evolved_techniques = []
-                for technique in techniques:
-                    evolved = technique.evolve({
-                        'overall': pattern.score,
-                        'aesthetic': pattern.aesthetic_score,
-                        'complexity': pattern.mathematical_complexity,
-                        'innovation': pattern.innovation_score,
-                        'combined_techniques': [t.name for t in techniques]
-                    })
-                    evolved_techniques.append(evolved)
-                    self.db.save_technique(evolved)
                 
                 # Save pattern to database
                 self.db.save_pattern(pattern)
@@ -557,10 +673,120 @@ Make it clear and impactful."""
             self.log.error(f"Error uploading file: {str(e)}")
             return None
     
-    def create_variation(self, metadata_file: Path) -> bool:
-        """Create variation of a static Flux piece"""
+    def _variation_wizard(self, original_prompt: str) -> str:
+        """
+        Guide user through creating a variation of an existing prompt.
+        """
+        print("\n════════════════════════════════════════════════════════════════════════════════")
+        print("║ VARIATION WIZARD")
+        print("════════════════════════════════════════════════════════════════════════════════\n")
+        
+        print(f"Original prompt: {original_prompt}\n")
+        
+        # Options for variation
+        print("How would you like to modify the image?")
+        print("1. Change subject")
+        print("2. Change style")
+        print("3. Change mood")
+        print("4. Add specific elements")
+        print("5. Custom instruction")
+        
+        while True:
+            try:
+                choice = int(input("\nEnter choice (1-5): "))
+                if 1 <= choice <= 5:
+                    break
+                print("Invalid choice")
+            except ValueError:
+                print("Please enter a number")
+        
+        elements = self.config.static_image_config['prompt_elements']
+        
+        if choice == 1:
+            print("\nPick a new Subject:")
+            subjects = self.config.static_image_config['categories']['subjects']
+            for i, subject in enumerate(subjects, 1):
+                print(f"{i}. {subject}")
+            while True:
+                try:
+                    subchoice = int(input("\nEnter choice (1-{}): ".format(len(subjects))))
+                    if 1 <= subchoice <= len(subjects):
+                        modification = f"Change the subject to {subjects[subchoice-1]}"
+                        break
+                except ValueError:
+                    print("Please enter a number")
+                    
+        elif choice == 2:
+            print("\nPick a new Style:")
+            styles = elements['stylistic_approaches']
+            for i, style in enumerate(styles, 1):
+                print(f"{i}. {style}")
+            while True:
+                try:
+                    subchoice = int(input("\nEnter choice (1-{}): ".format(len(styles))))
+                    if 1 <= subchoice <= len(styles):
+                        modification = f"Change the style to {styles[subchoice-1]}"
+                        break
+                except ValueError:
+                    print("Please enter a number")
+                    
+        elif choice == 3:
+            print("\nPick a new Mood:")
+            moods = elements['emotional_qualities']
+            for i, mood in enumerate(moods, 1):
+                print(f"{i}. {mood}")
+            while True:
+                try:
+                    subchoice = int(input("\nEnter choice (1-{}): ".format(len(moods))))
+                    if 1 <= subchoice <= len(moods):
+                        modification = f"Change the mood to {moods[subchoice-1]}"
+                        break
+                except ValueError:
+                    print("Please enter a number")
+                    
+        elif choice == 4:
+            print("\nWhat elements would you like to add? (e.g. 'swirling fractals', 'text PRISM')")
+            modification = input("> ").strip()
+            
+        else:  # choice == 5
+            print("\nEnter your custom modification instruction:")
+            modification = input("> ").strip()
+        
+        # Use GPT to create the variation
         try:
-            # Initialize required attributes
+            client = openai.OpenAI(api_key=self.config.openai_key)
+            system_prompt = """You are an AI assistant that creates variations of art prompts.
+Take the original prompt and apply the requested modification.
+Keep the result under 30 words.
+Be direct and clear.
+Preserve key elements unless explicitly changed.
+Return ONLY the final prompt."""
+            
+            user_prompt = f"""Original prompt: {original_prompt}
+Modification: {modification}
+
+Create a new prompt that applies this change while keeping other elements."""
+            
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            self.log.error(f"Error in variation wizard GPT step: {str(e)}")
+            # Fallback to simple modification
+            return f"{original_prompt} with {modification}"
+
+    def create_variation(self, metadata_file: Path) -> bool:
+        """Create variation of a static Flux piece using guided wizard"""
+        try:
+            # Initialize required attributes if needed
             if not hasattr(self, 'current_complexity'):
                 self.current_complexity = 0.7
             if not hasattr(self, 'current_innovation'):
@@ -576,15 +802,11 @@ Make it clear and impactful."""
             if not hasattr(self, 'db'):
                 self.db = DatabaseManager(self.config)
             
-            # Load original metadata with utf-8-sig encoding to handle BOM
+            # Load original metadata
             with open(metadata_file, 'r', encoding='utf-8-sig') as f:
-                content = f.read().strip()
-                if not content:
-                    self.log.error("Empty metadata file")
-                    return False
-                metadata = json.loads(content)
+                metadata = json.loads(f.read().strip())
             
-            # Display original prompt and metadata
+            # Display original creation info
             self.log.info("\nOriginal Creation:")
             self.log.info(f"Prompt: {metadata['prompt']}")
             if 'techniques' in metadata:
@@ -592,15 +814,10 @@ Make it clear and impactful."""
             if 'model' in metadata:
                 self.log.info(f"Model: {metadata['model']}")
             
-            # Get variation instructions
-            print("\nEnter your variation instructions (e.g. 'make it more abstract' or 'add subtle PRISM text')")
-            print("Or press Enter to keep original prompt and adjust interactively")
-            variation_instructions = input("> ").strip()
-            
-            # Get number of variations to generate
+            # Get number of variations
             while True:
                 try:
-                    num_variations = input("\nHow many unique variations would you like to generate? (1-10): ").strip()
+                    num_variations = input("\nHow many variations would you like to generate? (1-10): ").strip()
                     num_variations = int(num_variations)
                     if 1 <= num_variations <= 10:
                         break
@@ -608,87 +825,24 @@ Make it clear and impactful."""
                 except ValueError:
                     print("Please enter a valid number")
             
-            # Build system prompt for generating multiple variations
-            if variation_instructions:
-                system_prompt = f"""You are helping create multiple unique variations of an existing AI artwork.
-Original prompt: {metadata['prompt']}
-User wants these changes: {variation_instructions}
-
-Create {num_variations} unique prompts that maintain the core style and elements of the original,
-but incorporate the requested changes in different creative ways.
-Each prompt should be distinctly different while staying true to the original concept.
-Format your response as a numbered list, with each prompt on a new line starting with a number.
-Example:
-1. First unique variation...
-2. Second unique variation...
-etc.
-
-Return ONLY the numbered list of prompts."""
-
-                # Get multiple unique prompts from OpenAI
-                client = openai.OpenAI(api_key=self.config.openai_key)
-                response = client.chat.completions.create(
-                    model="gpt-4o",  # Using the correct implemented model
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"Generate {num_variations} unique variations."}
-                    ],
-                    temperature=0.9  # Higher temperature for more variety
-                )
-                
-                # Parse the numbered list of prompts
-                prompts_text = response.choices[0].message.content.strip()
-                new_prompts = []
-                for line in prompts_text.split('\n'):
-                    if line.strip() and any(line.startswith(f"{i}.") for i in range(1, num_variations + 1)):
-                        prompt = line.split('.', 1)[1].strip()
-                        new_prompts.append(prompt)
-            else:
-                # If no instructions, just use the original prompt multiple times
-                new_prompts = [metadata['prompt']] * num_variations
-            
-            # Set model and size from original metadata if available
-            if 'model' in metadata:
-                try:
-                    self.selected_model = FluxModel[metadata['model']]
-                except KeyError:
-                    pass  # Keep default if model not found
-            
-            if 'image_size' in metadata:
-                try:
-                    self.selected_size = ImageSize[metadata['image_size']]
-                except KeyError:
-                    pass  # Keep default if size not found
-            
-            # Generate variations with same parameters as original if available
-            params = metadata.get('parameters', {})
-            
+            # Generate variations using the wizard
             success = True
-            for i, prompt in enumerate(new_prompts, 1):
-                self.log.info(f"\nGenerating variation {i} of {num_variations}...")
-                self.log.info(f"Prompt: {prompt}")
+            for i in range(num_variations):
+                self.log.info(f"\nCreating variation {i+1} of {num_variations}")
+                new_prompt = self._variation_wizard(metadata['prompt'])
                 
-                # Generate the variation with the unique prompt
+                # Generate the variation
                 current_success = self.generate_with_ai(
-                    prompt,
-                    complexity=params.get('complexity', 0.7),
-                    innovation=params.get('innovation', 0.5),
-                    guidance_scale=params.get('guidance_scale', 4.5),
-                    num_inference_steps=params.get('num_inference_steps', 28)
+                    new_prompt,
+                    complexity=metadata.get('parameters', {}).get('complexity', 0.7),
+                    innovation=metadata.get('parameters', {}).get('innovation', 0.5),
+                    guidance_scale=metadata.get('parameters', {}).get('guidance_scale', 4.5),
+                    num_inference_steps=metadata.get('parameters', {}).get('num_inference_steps', 28)
                 )
                 success = success and current_success
             
             return success
             
-        except json.JSONDecodeError as je:
-            self.log.error(f"Error reading metadata file (JSON format error): {je}")
-            if hasattr(self.log, 'debug_mode') and self.log.debug_mode:
-                with open(metadata_file, 'r', encoding='utf-8-sig') as f:
-                    self.log.debug(f"File contents:\n{f.read()}")
-            return False
         except Exception as e:
-            self.log.error(f"Error creating static variation: {e}")
-            if hasattr(self.log, 'debug_mode') and self.log.debug_mode:
-                import traceback
-                self.log.debug(traceback.format_exc())
+            self.log.error(f"Error creating variation: {str(e)}")
             return False 
