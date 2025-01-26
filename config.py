@@ -70,25 +70,17 @@ class Config:
                 }
             },
             'prompt_elements': {
-                'artistic_domains': [
-                    'abstract', 'figurative', 'conceptual', 'surreal',
-                    'minimalist', 'maximalist', 'traditional', 'experimental',
-                    'digital', 'organic', 'architectural', 'natural'
-                ],
                 'visual_elements': [
-                    'color', 'form', 'texture', 'space', 'line',
-                    'shape', 'pattern', 'light', 'shadow', 'movement',
-                    'depth', 'contrast', 'rhythm', 'balance', 'focus'
+                    'color', 'form', 'texture', 'light',
+                    'pattern', 'depth', 'contrast', 'movement'
                 ],
                 'emotional_qualities': [
                     'serene', 'dynamic', 'mysterious', 'bold',
-                    'subtle', 'chaotic', 'harmonious', 'tense',
-                    'playful', 'somber', 'ethereal', 'grounded'
+                    'ethereal', 'chaotic', 'harmonious', 'playful'
                 ],
                 'stylistic_approaches': [
-                    'painterly', 'photographic', 'illustrative', 'graphic',
-                    'textural', 'geometric', 'fluid', 'structured',
-                    'layered', 'minimal', 'detailed', 'atmospheric'
+                    'painterly', 'photographic', 'illustrative',
+                    'geometric', 'minimal', 'textural', 'atmospheric'
                 ]
             },
             'creative_guidance': {

@@ -371,8 +371,10 @@ class FluxGenerator:
     
     def _parse_techniques_from_prompt(self, prompt: str) -> List[Technique]:
         """Parse techniques from the prompt string"""
-        # Split prompt into technique names
+        # Split prompt into technique names and limit to 1-2 random techniques
         technique_names = [t.strip() for t in prompt.split(',')]
+        if len(technique_names) > 2:
+            technique_names = random.sample(technique_names, random.randint(1, 2))
         
         # Create proper Technique objects with required fields
         techniques = []
@@ -397,49 +399,34 @@ class FluxGenerator:
         return True, None
     
     def _build_creative_prompt(self, techniques: List[Technique]) -> str:
-        """Build an artistic prompt using a versatile, creative approach"""
+        """Build a concise, focused artistic prompt"""
         try:
             # Initialize OpenAI client
             client = openai.OpenAI(api_key=self.config.openai_key)
             
             # Get creative elements from config
             elements = self.config.static_image_config['prompt_elements']
-            guidance = self.config.static_image_config['creative_guidance']
-            guidelines = self.config.static_image_config['ai_agent_guidelines']
             
             # Build system prompt for creative interpretation
-            system_prompt = """You are an expert AI art director with deep knowledge of various artistic styles and approaches.
-Your task is to create an evocative, imaginative prompt that will guide an AI image generator.
-Consider the artistic elements provided and weave them into a cohesive visual narrative.
-Focus on creating unique and compelling artistic visions.
+            system_prompt = """You are an expert AI art director.
+Create a clear, focused prompt for an AI image generator.
+Keep it under 50 words.
+Focus on the core visual concept.
+Be direct and specific.
 Return ONLY the final prompt text."""
 
             # Build artistic context
-            artistic_context = "\n".join([
-                f"- {t.name}: {t.description}" for t in techniques
-            ])
+            artistic_context = ", ".join([t.name for t in techniques])
             
             # Build user prompt with creative guidance
-            user_prompt = f"""Create an artistic vision incorporating these elements:
+            user_prompt = f"""Create a focused prompt using:
 
-{artistic_context}
+Main elements: {artistic_context}
+Style: {random.choice(elements['stylistic_approaches'])}
+Key visual: {random.choice(elements['visual_elements'])}
+Mood: {random.choice(elements['emotional_qualities'])}
 
-Artistic Elements to Consider:
-- Domain: {', '.join(random.sample(elements['artistic_domains'], 2))}
-- Visual: {', '.join(random.sample(elements['visual_elements'], 3))}
-- Emotion: {', '.join(random.sample(elements['emotional_qualities'], 2))}
-- Style: {', '.join(random.sample(elements['stylistic_approaches'], 2))}
-
-Creative Inspiration:
-{random.choice(guidance['conceptual_fusion']['examples'])}
-{random.choice(guidance['artistic_balance']['examples'])}
-{random.choice(guidance['narrative_depth']['examples'])}
-
-Artistic Guidelines:
-- {random.choice(guidelines['prompt_crafting'])}
-- {random.choice(guidelines['quality_aspects'])}
-
-Create a unique, evocative prompt that brings these elements together into a compelling artistic vision."""
+Make it clear and impactful."""
 
             # Get creative prompt from OpenAI
             response = client.chat.completions.create(
@@ -448,7 +435,7 @@ Create a unique, evocative prompt that brings these elements together into a com
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.9  # High temperature for creative variety
+                temperature=0.7
             )
             
             return response.choices[0].message.content.strip()
@@ -456,7 +443,7 @@ Create a unique, evocative prompt that brings these elements together into a com
         except Exception as e:
             self.log.error(f"Error building creative prompt: {str(e)}")
             # Simple artistic fallback
-            return f"An artistic interpretation exploring {', '.join([t.name for t in techniques])}"
+            return f"A {random.choice(elements['stylistic_approaches'])} artwork featuring {', '.join([t.name for t in techniques])}"
     
     def _build_flux_config(self) -> FluxConfig:
         """Build Flux configuration based on current settings"""
