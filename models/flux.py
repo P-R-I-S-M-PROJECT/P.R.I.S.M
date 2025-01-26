@@ -196,6 +196,10 @@ class FluxGenerator:
             flux_config.image_size = self.selected_size
             flux_config.model = self.selected_model
             
+            # Set seed if provided
+            if 'seed' in kwargs:
+                flux_config.seed = kwargs['seed']
+            
             # Always show the creative prompt
             self.log.info(f"Creative prompt: {creative_prompt}")
 
@@ -211,7 +215,8 @@ class FluxGenerator:
                     "complexity": self.current_complexity,
                     "innovation": self.current_innovation,
                     "guidance_scale": flux_config.guidance_scale,
-                    "num_inference_steps": flux_config.num_inference_steps
+                    "num_inference_steps": flux_config.num_inference_steps,
+                    "seed": flux_config.seed
                 },
                 "parent_patterns": [p.version for p in recent_patterns] if recent_patterns else []
             }
@@ -236,7 +241,8 @@ class FluxGenerator:
                     "guidance_scale": flux_config.guidance_scale,
                     "num_images": 1,
                     "enable_safety_checker": True,
-                    "sync_mode": True
+                    "sync_mode": True,
+                    "seed": flux_config.seed
                 },
                 with_logs=True,
                 on_queue_update=on_queue_update
@@ -391,58 +397,49 @@ class FluxGenerator:
         return True, None
     
     def _build_creative_prompt(self, techniques: List[Technique]) -> str:
-        """Convert PRISM techniques into a creative prompt for Flux using OpenAI 4O"""
+        """Build an artistic prompt using a versatile, creative approach"""
         try:
-            # Initialize OpenAI 4O client
+            # Initialize OpenAI client
             client = openai.OpenAI(api_key=self.config.openai_key)
             
-            # Map techniques to categories
-            categories = {
-                'subject': [],
-                'style': [],
-                'mood': [],
-                'composition': []
-            }
+            # Get creative elements from config
+            elements = self.config.static_image_config['prompt_elements']
+            guidance = self.config.static_image_config['creative_guidance']
+            guidelines = self.config.static_image_config['ai_agent_guidelines']
             
-            for technique in techniques:
-                # Map technique to most appropriate category
-                if technique.category in ['patterns', 'geometry']:
-                    categories['subject'].append(technique.name)
-                elif technique.category in ['style', 'color']:
-                    categories['style'].append(technique.name)
-                elif technique.category in ['motion', 'dynamics']:
-                    categories['mood'].append(technique.name)
-                else:
-                    categories['composition'].append(technique.name)
-            
-            # Fill in missing categories from config
-            for category in categories:
-                if not categories[category]:
-                    categories[category] = [random.choice(
-                        self.config.static_image_config['categories'][category]
-                    )]
-            
-            # Get base template
-            template = self.config.get_prompt_template()
-            
-            # Build system prompt
-            system_prompt = """You are a creative AI specializing in artistic image prompts.
-Create evocative, imaginative prompts that combine artistic elements in unique ways.
-Use the provided template structure but feel free to enhance it creatively.
-Focus on visual impact and emotional resonance.
-Return ONLY the prompt text."""
+            # Build system prompt for creative interpretation
+            system_prompt = """You are an expert AI art director with deep knowledge of various artistic styles and approaches.
+Your task is to create an evocative, imaginative prompt that will guide an AI image generator.
+Consider the artistic elements provided and weave them into a cohesive visual narrative.
+Focus on creating unique and compelling artistic visions.
+Return ONLY the final prompt text."""
 
-            # Build user prompt
-            user_prompt = f"""Create an artistic prompt using this template:
-{template}
+            # Build artistic context
+            artistic_context = "\n".join([
+                f"- {t.name}: {t.description}" for t in techniques
+            ])
+            
+            # Build user prompt with creative guidance
+            user_prompt = f"""Create an artistic vision incorporating these elements:
 
-With these elements:
-Subject: {', '.join(categories['subject'])}
-Style: {', '.join(categories['style'])}
-Mood: {', '.join(categories['mood'])}
-Composition: {', '.join(categories['composition'])}
+{artistic_context}
 
-Make it unique and visually compelling."""
+Artistic Elements to Consider:
+- Domain: {', '.join(random.sample(elements['artistic_domains'], 2))}
+- Visual: {', '.join(random.sample(elements['visual_elements'], 3))}
+- Emotion: {', '.join(random.sample(elements['emotional_qualities'], 2))}
+- Style: {', '.join(random.sample(elements['stylistic_approaches'], 2))}
+
+Creative Inspiration:
+{random.choice(guidance['conceptual_fusion']['examples'])}
+{random.choice(guidance['artistic_balance']['examples'])}
+{random.choice(guidance['narrative_depth']['examples'])}
+
+Artistic Guidelines:
+- {random.choice(guidelines['prompt_crafting'])}
+- {random.choice(guidelines['quality_aspects'])}
+
+Create a unique, evocative prompt that brings these elements together into a compelling artistic vision."""
 
             # Get creative prompt from OpenAI
             response = client.chat.completions.create(
@@ -451,35 +448,15 @@ Make it unique and visually compelling."""
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.9
+                temperature=0.9  # High temperature for creative variety
             )
             
-            if not response.choices:
-                raise ValueError("No response from OpenAI")
-                
-            creative_prompt = response.choices[0].message.content.strip()
-            
-            # Add quality modifiers based on complexity
-            modifiers = self.config.get_quality_modifiers(self.current_complexity)
-            if modifiers:
-                creative_prompt += f", {', '.join(modifiers)}"
-                
-            return creative_prompt
+            return response.choices[0].message.content.strip()
             
         except Exception as e:
             self.log.error(f"Error building creative prompt: {str(e)}")
-            # Use template-based fallback
-            template = self.config.get_prompt_template()
-            categories = {
-                'subject': techniques[0].name,
-                'style': 'artistic',
-                'mood': 'dynamic',
-                'composition': 'balanced'
-            }
-            return template.replace('[subject]', categories['subject'])\
-                         .replace('[style]', categories['style'])\
-                         .replace('[mood]', categories['mood'])\
-                         .replace('[composition]', categories['composition'])
+            # Simple artistic fallback
+            return f"An artistic interpretation exploring {', '.join([t.name for t in techniques])}"
     
     def _build_flux_config(self) -> FluxConfig:
         """Build Flux configuration based on current settings"""
@@ -596,7 +573,7 @@ Make it unique and visually compelling."""
     def create_variation(self, metadata_file: Path) -> bool:
         """Create variation of a static Flux piece"""
         try:
-            # Initialize required attributes if not set
+            # Initialize required attributes
             if not hasattr(self, 'current_complexity'):
                 self.current_complexity = 0.7
             if not hasattr(self, 'current_innovation'):
@@ -633,32 +610,55 @@ Make it unique and visually compelling."""
             print("Or press Enter to keep original prompt and adjust interactively")
             variation_instructions = input("> ").strip()
             
-            # Build variation prompt
+            # Get number of variations to generate
+            while True:
+                try:
+                    num_variations = input("\nHow many unique variations would you like to generate? (1-10): ").strip()
+                    num_variations = int(num_variations)
+                    if 1 <= num_variations <= 10:
+                        break
+                    print("Please enter a number between 1 and 10")
+                except ValueError:
+                    print("Please enter a valid number")
+            
+            # Build system prompt for generating multiple variations
             if variation_instructions:
-                system_prompt = f"""You are helping create a variation of an existing AI artwork.
+                system_prompt = f"""You are helping create multiple unique variations of an existing AI artwork.
 Original prompt: {metadata['prompt']}
 User wants these changes: {variation_instructions}
 
-Create a new prompt that maintains the core style and elements of the original,
-but incorporates the requested changes. Return only the new prompt text."""
+Create {num_variations} unique prompts that maintain the core style and elements of the original,
+but incorporate the requested changes in different creative ways.
+Each prompt should be distinctly different while staying true to the original concept.
+Format your response as a numbered list, with each prompt on a new line starting with a number.
+Example:
+1. First unique variation...
+2. Second unique variation...
+etc.
 
-                # Get new prompt from OpenAI
+Return ONLY the numbered list of prompts."""
+
+                # Get multiple unique prompts from OpenAI
                 client = openai.OpenAI(api_key=self.config.openai_key)
                 response = client.chat.completions.create(
                     model="gpt-4o",  # Using the correct implemented model
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": "Generate the new prompt."}
+                        {"role": "user", "content": f"Generate {num_variations} unique variations."}
                     ],
-                    temperature=0.7
+                    temperature=0.9  # Higher temperature for more variety
                 )
                 
-                new_prompt = response.choices[0].message.content.strip()
+                # Parse the numbered list of prompts
+                prompts_text = response.choices[0].message.content.strip()
+                new_prompts = []
+                for line in prompts_text.split('\n'):
+                    if line.strip() and any(line.startswith(f"{i}.") for i in range(1, num_variations + 1)):
+                        prompt = line.split('.', 1)[1].strip()
+                        new_prompts.append(prompt)
             else:
-                new_prompt = metadata['prompt']
-            
-            # Show new prompt
-            self.log.info(f"\nNew prompt: {new_prompt}")
+                # If no instructions, just use the original prompt multiple times
+                new_prompts = [metadata['prompt']] * num_variations
             
             # Set model and size from original metadata if available
             if 'model' in metadata:
@@ -673,17 +673,25 @@ but incorporates the requested changes. Return only the new prompt text."""
                 except KeyError:
                     pass  # Keep default if size not found
             
-            # Generate variation with same parameters as original if available
+            # Generate variations with same parameters as original if available
             params = metadata.get('parameters', {})
             
-            # Generate the variation
-            return self.generate_with_ai(
-                new_prompt,
-                complexity=params.get('complexity', 0.7),
-                innovation=params.get('innovation', 0.5),
-                guidance_scale=params.get('guidance_scale', 4.5),
-                num_inference_steps=params.get('num_inference_steps', 28)
-            )
+            success = True
+            for i, prompt in enumerate(new_prompts, 1):
+                self.log.info(f"\nGenerating variation {i} of {num_variations}...")
+                self.log.info(f"Prompt: {prompt}")
+                
+                # Generate the variation with the unique prompt
+                current_success = self.generate_with_ai(
+                    prompt,
+                    complexity=params.get('complexity', 0.7),
+                    innovation=params.get('innovation', 0.5),
+                    guidance_scale=params.get('guidance_scale', 4.5),
+                    num_inference_steps=params.get('num_inference_steps', 28)
+                )
+                success = success and current_success
+            
+            return success
             
         except json.JSONDecodeError as je:
             self.log.error(f"Error reading metadata file (JSON format error): {je}")

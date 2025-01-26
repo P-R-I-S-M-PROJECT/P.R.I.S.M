@@ -4,6 +4,29 @@
 
 PRISM is an automated art studio agent powered by a multi-model AI architecture. It leverages OpenAI and Anthropic models for creative code-based art generation, alongside FAL's Flux model for static visual art. The system functions as an evolving creative entity, learning from its artistic journey and adapting its approach based on experience.
 
+## Artistic Intelligence
+
+The system employs a sophisticated approach to artistic creation:
+
+1. **Adaptive Prompt Generation**
+   - Context-aware prompt crafting
+   - Dynamic artistic element fusion
+   - Cultural and stylistic awareness
+   - Balanced creative guidance
+
+2. **Variation System**
+   - Multiple unique interpretations
+   - User-guided variations
+   - Artistic lineage preservation
+   - Batch processing capabilities
+   - Creative prompt evolution
+
+3. **Style Integration**
+   - Seamless element blending
+   - Traditional-contemporary fusion
+   - Cultural context awareness
+   - Artistic domain mixing
+
 ## Interactive Studio Interface
 
 The system provides an intuitive studio interface:

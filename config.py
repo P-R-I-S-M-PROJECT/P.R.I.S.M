@@ -69,41 +69,78 @@ class Config:
                     }
                 }
             },
-            'categories': {
-                'subject': [
-                    'animal', 'architecture', 'art', 'character', 
-                    'nature', 'people', 'phenomena', 'science'
+            'prompt_elements': {
+                'artistic_domains': [
+                    'abstract', 'figurative', 'conceptual', 'surreal',
+                    'minimalist', 'maximalist', 'traditional', 'experimental',
+                    'digital', 'organic', 'architectural', 'natural'
                 ],
-                'style': [
-                    'cinematic', 'photography', 'painting', 'digital_art',
-                    'concept_art', 'abstract', 'realistic', 'surreal'
+                'visual_elements': [
+                    'color', 'form', 'texture', 'space', 'line',
+                    'shape', 'pattern', 'light', 'shadow', 'movement',
+                    'depth', 'contrast', 'rhythm', 'balance', 'focus'
                 ],
-                'mood': [
-                    'dramatic', 'peaceful', 'mysterious', 'energetic',
-                    'melancholic', 'ethereal', 'dark', 'vibrant'
+                'emotional_qualities': [
+                    'serene', 'dynamic', 'mysterious', 'bold',
+                    'subtle', 'chaotic', 'harmonious', 'tense',
+                    'playful', 'somber', 'ethereal', 'grounded'
                 ],
-                'composition': [
-                    'close_up', 'wide_shot', 'aerial_view', 'macro',
-                    'portrait', 'landscape', 'abstract_composition'
+                'stylistic_approaches': [
+                    'painterly', 'photographic', 'illustrative', 'graphic',
+                    'textural', 'geometric', 'fluid', 'structured',
+                    'layered', 'minimal', 'detailed', 'atmospheric'
                 ]
             },
-            'prompt_templates': [
-                "[subject] in style of [style], [mood] atmosphere, [composition] view",
-                "A [mood] interpretation of [subject] through [style] lens",
-                "[style] exploration of [subject] with [mood] undertones",
-                "The mathematics of [mood] divide endlessly into fractals of [subject]",
-                "[subject] frequencies slice through [composition], leaving trails of [mood]"
-            ],
-            'quality_modifiers': {
-                'detail_level': ['intricate', 'highly detailed', 'minimalist'],
-                'lighting': ['dramatic lighting', 'soft light', 'backlit'],
-                'color_scheme': ['monochromatic', 'vibrant colors', 'muted palette'],
-                'texture': ['smooth', 'rough', 'organic', 'metallic']
+            'creative_guidance': {
+                'conceptual_fusion': {
+                    'description': 'How different artistic elements can blend',
+                    'examples': [
+                        'Traditional techniques merging with digital aesthetics',
+                        'Abstract concepts materializing through organic forms',
+                        'Cultural elements weaving into contemporary expressions'
+                    ]
+                },
+                'artistic_balance': {
+                    'description': 'Balance between different artistic elements',
+                    'examples': [
+                        'Chaos and order in dynamic equilibrium',
+                        'Traditional and contemporary elements in harmony',
+                        'Personal vision meeting universal themes'
+                    ]
+                },
+                'narrative_depth': {
+                    'description': 'Ways to add depth and meaning',
+                    'examples': [
+                        'Layered symbolism and metaphor',
+                        'Personal and universal storytelling',
+                        'Cultural and historical references'
+                    ]
+                }
+            },
+            'ai_agent_guidelines': {
+                'prompt_crafting': [
+                    'Blend different artistic elements intuitively',
+                    'Balance tradition with innovation',
+                    'Embrace diverse artistic perspectives',
+                    'Consider cultural and personal contexts'
+                ],
+                'variation_approaches': [
+                    'Explore multiple artistic interpretations',
+                    'Play with different cultural influences',
+                    'Experiment with technique combinations',
+                    'Adapt to different artistic contexts'
+                ],
+                'quality_aspects': [
+                    'Visual impact and aesthetic harmony',
+                    'Conceptual depth and clarity',
+                    'Technical execution and innovation',
+                    'Cultural relevance and resonance'
+                ]
             },
             'evaluation_criteria': {
-                'technical': ['composition', 'color_harmony', 'detail_quality'],
-                'artistic': ['creativity', 'emotional_impact', 'uniqueness'],
-                'conceptual': ['theme_clarity', 'narrative_strength', 'symbolism']
+                'aesthetic': ['composition', 'harmony', 'impact'],
+                'technical': ['execution', 'innovation', 'control'],
+                'conceptual': ['depth', 'originality', 'resonance']
             }
         }
         
