@@ -209,18 +209,6 @@ PRISM's variation system allows deep exploration of artistic ideas:
    - Balance detail and brevity
    - Consider visual hierarchy
 
-2. **Model Selection**
-   - Match model to task
-   - Consider style requirements
-   - Test different approaches
-   - Document preferences
-
-3. **Studio Organization**
-   - Name files consistently
-   - Track variations
-   - Document processes
-   - Maintain backups
-
 ## 🏗️ Technical Details
 
 ### Requirements
