@@ -36,21 +36,6 @@ class PRISM:
         # Initialize database
         self.db = DatabaseManager(self.config)
         
-        # Load system stats
-        stats = self.db.get_system_stats()
-        if stats:
-            self.log.info("\nPattern Statistics:")
-            self.log.info(f"• Total Patterns: {stats['total_patterns']}")
-            self.log.info(f"• Latest Version: v{stats['latest_version']}")
-            self.log.info(f"• High Scoring Patterns: {stats['high_scoring_patterns']}")
-            self.log.info("\nPerformance Metrics:")
-            self.log.info(f"• Average Score: {stats['avg_score']:.2f}")
-            self.log.info(f"• Average Innovation: {stats['avg_innovation']:.2f}")
-            self.log.info(f"• Average Complexity: {stats['avg_complexity']:.2f}")
-            self.log.info("\nTop Technique Combinations:")
-            for combo in stats.get('top_technique_combinations', []):
-                self.log.info(f"• {combo}")
-        
         # Initialize components with shared logger
         self.generator = ProcessingGenerator(self.config, self.log)
         self.docs = DocumentationManager(self.config, self.log)
