@@ -144,10 +144,6 @@ class DynamicBuilder:
             if choice == "2":
                 # Build prompt with just guidelines
                 prompt = self._build_creative_prompt(
-                    motion_style="",
-                    shape_elements="",
-                    color_approach="",
-                    pattern_type="",
                     custom_guidelines=custom_guidelines
                 )
                 return self._generate_artwork(prompt)
@@ -170,10 +166,10 @@ class DynamicBuilder:
         
         # Build the creative prompt
         prompt = self._build_creative_prompt(
-            motion_style,
-            shape_elements,
-            color_approach,
-            pattern_type,
+            motion_style=motion_style,
+            shape_elements=shape_elements,
+            color_approach=color_approach,
+            pattern_type=pattern_type,
             custom_guidelines=custom_guidelines
         )
         
@@ -363,15 +359,15 @@ class DynamicBuilder:
             except ValueError:
                 print("Please enter a number or press Enter to skip")
     
-    def _build_creative_prompt(self, motion: str, shapes: str, colors: str, pattern: str, custom_guidelines: str = "") -> dict:
+    def _build_creative_prompt(self, motion_style: str = "", shape_elements: str = "", color_approach: str = "", pattern_type: str = "", custom_guidelines: str = "") -> dict:
         """Build the creative prompt from selected options"""
         # Start with base prompt structure
         prompt = {
             "techniques": self.selected_techniques,
-            "motion_style": motion,
-            "shape_elements": shapes,
-            "color_approach": colors,
-            "pattern_type": pattern,
+            "motion_style": motion_style,
+            "shape_elements": shape_elements,
+            "color_approach": color_approach,
+            "pattern_type": pattern_type,
         }
         
         if custom_guidelines:
@@ -477,4 +473,161 @@ class DynamicBuilder:
             if self.config.debug_mode:
                 import traceback
                 self.log.debug(traceback.format_exc())
-            return False 
+            return False
+
+    def get_creation_settings(self, model_name: str = None) -> dict:
+        """Collect all settings from the wizard but don't generate artwork yet"""
+        if model_name:
+            self.selected_model = model_name
+        else:
+            self._choose_model()
+            
+        print("\n════════════════════════════════════════════════════════════════════════════════")
+        print("║ DYNAMIC ART WIZARD")
+        print(f"║ Using Model: {self.selected_model}")
+        print("════════════════════════════════════════════════════════════════════════════════\n")
+        
+        # Get any custom guidelines first
+        print("\nChoose Creative Mode:")
+        print("1. Particle Systems (physics-based animations)")
+        print("2. Geometric Transformations (shape morphing)")
+        print("3. Pattern Generation (recursive/emergent)")
+        print("4. Text Art (shape-based/organic)")
+        print("5. Custom Guidelines")
+        print("\nEnter choice (1-5) or press Enter to skip: ")
+        mode_choice = input().strip()
+        
+        custom_guidelines = ""
+        if mode_choice:
+            if mode_choice == "1":  # Particle Systems
+                print("\nParticle System Options:")
+                print("1. Galaxy/Star system")
+                print("2. Flocking/Swarming")
+                print("3. Particle Attraction")
+                print("4. Rain/Snow simulation")
+                behavior = input("Choose particle behavior (1-4): ").strip()
+                
+                behaviors = {
+                    "1": "Create a galaxy-like system with stars orbiting a central point, using gravitational forces",
+                    "2": "Implement a flocking system where particles follow emergent swarm behavior",
+                    "3": "Design particles that attract/repel based on proximity and forces",
+                    "4": "Simulate natural phenomena with particles affected by wind and gravity"
+                }
+                custom_guidelines = behaviors.get(behavior, behaviors["1"])
+                
+            elif mode_choice == "2":  # Geometric Transformations
+                print("\nGeometric Options:")
+                print("1. Sacred Geometry")
+                print("2. Tessellation")
+                print("3. Fractal Growth")
+                print("4. Shape Morphing")
+                geometry = input("Choose geometric style (1-4): ").strip()
+                
+                geometries = {
+                    "1": "Transform between sacred geometry patterns (flower of life, metatron's cube, etc)",
+                    "2": "Create evolving tessellation patterns that fill the space",
+                    "3": "Generate recursive fractal patterns that grow and evolve",
+                    "4": "Morph between different geometric shapes smoothly"
+                }
+                custom_guidelines = geometries.get(geometry, geometries["1"])
+                
+            elif mode_choice == "3":  # Pattern Generation
+                print("\nPattern Options:")
+                print("1. Reaction Diffusion")
+                print("2. Cellular Automata")
+                print("3. Flow Fields")
+                print("4. Wave Patterns")
+                pattern = input("Choose pattern type (1-4): ").strip()
+                
+                patterns = {
+                    "1": "Create organic patterns using reaction-diffusion algorithms",
+                    "2": "Generate evolving patterns using cellular automata rules",
+                    "3": "Design dynamic flow fields that guide particle movement",
+                    "4": "Create interference patterns using overlapping waves"
+                }
+                custom_guidelines = patterns.get(pattern, patterns["1"])
+                
+            elif mode_choice == "4":  # Text Art
+                print("\nWhat text would you like to create? (e.g. 'PRISM', 'Hello', etc.)")
+                desired_text = input().strip() or "PRISM"  # Default to PRISM if empty
+                
+                # NEW: Ask for additional instructions
+                print("\nWould you like to add any additional instructions? (e.g. 'only vertical motion', 'use specific colors', etc.)")
+                print("Press Enter to skip")
+                extra_instructions = input("> ").strip()
+                
+                print("\nText Art Options:")
+                print("1. Particle Text")
+                print("2. Pattern-Filled Text")
+                print("3. Emergent Text")
+                print("4. Morphing Text")
+                print("\nEnter choice (1-4) or press Enter to let AI choose: ")
+                text_style = input().strip()
+                
+                text_styles = {
+                    "1": f"Form the text '{desired_text}' using dynamic particle systems that assemble and flow",
+                    "2": f"Fill the text '{desired_text}' with intricate patterns and motion",
+                    "3": f"Create the text '{desired_text}' that emerges from underlying patterns",
+                    "4": f"Transform flowing shapes that morph into the text '{desired_text}'"
+                }
+                custom_guidelines = text_styles.get(text_style, f"Create organic text spelling '{desired_text}' through shape-based patterns and dynamic motion")
+                
+                # Append extra instructions if provided
+                if extra_instructions:
+                    custom_guidelines += f"\nAdditional Requirements: {extra_instructions}"
+            
+            elif mode_choice == "5":  # Custom Guidelines
+                print("\nEnter your custom creative guidelines:")
+                custom_guidelines = input().strip()
+        
+        # Store all settings in a dictionary
+        settings = {
+            'model_name': self.selected_model,
+            'custom_guidelines': custom_guidelines
+        }
+        
+        # If they want to skip wizard with just guidelines
+        if custom_guidelines:
+            print("\nWould you like to:")
+            print("1. Use guidelines with wizard (recommended)")
+            print("2. Use only guidelines (skip wizard)")
+            choice = input("\nEnter choice (1-2) or press Enter for option 1: ").strip()
+            
+            if choice == "2":
+                settings['skip_wizard'] = True
+                return settings
+        
+        # Get all wizard settings
+        self._choose_base_techniques()
+        settings['techniques'] = self.selected_techniques
+        
+        settings['motion_style'] = self._choose_motion_style()
+        settings['shape_elements'] = self._choose_shape_elements()
+        settings['color_approach'] = self._choose_color_approach()
+        settings['pattern_type'] = self._choose_pattern_type()
+        
+        return settings
+        
+    def create_with_settings(self, settings: dict) -> Optional[Pattern]:
+        """Create artwork using stored settings"""
+        self.selected_model = settings['model_name']
+        self.selected_techniques = settings.get('techniques', [])
+        
+        if settings.get('skip_wizard'):
+            prompt = self._build_creative_prompt(
+                motion_style="",
+                shape_elements="",
+                color_approach="",
+                pattern_type="",
+                custom_guidelines=settings['custom_guidelines']
+            )
+        else:
+            prompt = self._build_creative_prompt(
+                motion_style=settings.get('motion_style', ""),
+                shape_elements=settings.get('shape_elements', ""),
+                color_approach=settings.get('color_approach', ""),
+                pattern_type=settings.get('pattern_type', ""),
+                custom_guidelines=settings.get('custom_guidelines', "")
+            )
+            
+        return self._generate_artwork(prompt) 

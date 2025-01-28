@@ -167,9 +167,14 @@ class MenuManager:
                 try:
                     count = int(input("\nHow many pieces would you like to create? (1-10): "))
                     if 1 <= count <= 10:
+                        # Get settings once and store them
+                        self.log.info(f"\nSetting up creation parameters for {count} pieces...")
+                        settings = self.dynamic_builder.get_creation_settings(model_name=current_model)
+                        
+                        # Use stored settings for each piece
                         for i in range(count):
                             self.log.info(f"\nCreating piece {i+1} of {count}")
-                            pattern = self.dynamic_builder.show_creation_wizard(model_name=current_model)
+                            pattern = self.dynamic_builder.create_with_settings(settings)
                             if pattern:
                                 self.log.success(f"Pattern {i+1} created successfully")
                             else:

@@ -38,7 +38,43 @@ class OpenAIO1Generator:
             if skip_generation_prompt:
                 full_prompt = prompt
             else:
-                full_prompt = self._build_generation_prompt(prompt)
+                # Check if this is a guided prompt (contains custom guidelines or specific requirements)
+                is_guided = "=== IMPLEMENTATION REQUIREMENTS ===" in prompt or "Custom Requirements:" in prompt
+                
+                if is_guided:
+                    # For guided mode, focus on user requirements
+                    full_prompt = f"""=== PROCESSING SKETCH REQUIREMENTS ===
+{prompt}
+
+=== REQUIRED FUNCTIONS ===
+You MUST define these two functions:
+1. void initSketch() - Called once at start
+2. void runSketch(float progress) - Called each frame with progress (0.0 to 1.0)
+
+=== SYSTEM FRAMEWORK ===
+The system automatically handles these - DO NOT include them:
+• void setup() or draw() functions
+• size(1080, 1080) and frameRate settings
+• background(0) or any background clearing
+• translate(width/2, height/2) for centering
+• Frame saving and program exit
+
+=== CODE STRUCTURE ===
+1. Define any classes at the top
+2. Declare global variables
+3. Define initSketch() for setup
+4. Define runSketch(progress) for animation
+• The canvas is already centered at (0,0)
+• Initialize all variables with values
+• Use RGB values for colors (e.g., stroke(255, 0, 0) for red)
+
+=== RETURN FORMAT ===
+Return your code between these markers:
+// YOUR CREATIVE CODE GOES HERE
+// END OF YOUR CREATIVE CODE"""
+                else:
+                    # For non-guided mode, use the standard creative freedom prompt
+                    full_prompt = self._build_generation_prompt(prompt)
             
             # If this is a retry, build error-specific prompt
             if retry_count > 0:
@@ -565,13 +601,19 @@ Return your code between these markers:
         """Generate code using the wizard prompt data"""
         try:
             # Build creative prompt from wizard data
-            creative_prompt = f"""Create a dynamic Processing animation with these characteristics:"""
+            creative_prompt = ""
 
             # If there are custom guidelines, make them the primary focus
             if custom_guidelines:
                 creative_prompt = f"""{custom_guidelines}
 
 === IMPLEMENTATION REQUIREMENTS ==="""
+            else:
+                # Only add the general creative freedom prompt if no specific guidelines
+                creative_prompt = """=== PROCESSING SKETCH GENERATOR ===
+Create a visually appealing animation that loops smoothly over 6 seconds.
+Let your creativity guide the direction - feel free to explore and experiment.
+It's better to do a few things well than try to include everything."""
             
             # Add selected techniques if any
             if prompt_data['techniques']:
