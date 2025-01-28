@@ -32,7 +32,32 @@ class DynamicBuilder:
         print(f"║ Using Model: {self.selected_model}")
         print("════════════════════════════════════════════════════════════════════════════════\n")
         
+        # Get any custom guidelines first
+        print("\nDo you have any specific requirements or guidelines for this piece?")
+        print("(e.g., 'spell out PRISM', 'use only squares', 'make it look like a galaxy')")
+        print("Press Enter to skip or input your guidelines:")
+        custom_guidelines = input().strip()
+        
+        # If they provided guidelines but want to skip wizard, ask if they want to skip
+        if custom_guidelines:
+            print("\nWould you like to:")
+            print("1. Use guidelines with wizard (recommended)")
+            print("2. Use only guidelines (skip wizard)")
+            choice = input("\nEnter choice (1-2) or press Enter for option 1: ").strip()
+            
+            if choice == "2":
+                # Build prompt with just guidelines
+                prompt = self._build_creative_prompt(
+                    motion_style="",
+                    shape_elements="",
+                    color_approach="",
+                    pattern_type="",
+                    custom_guidelines=custom_guidelines
+                )
+                return self._generate_artwork(prompt)
+        
         # Step 1: Choose base techniques
+        print("\nChoose base mathematical techniques (press Enter at each step to skip):")
         self._choose_base_techniques()
         
         # Step 2: Choose motion style
@@ -52,7 +77,8 @@ class DynamicBuilder:
             motion_style,
             shape_elements,
             color_approach,
-            pattern_type
+            pattern_type,
+            custom_guidelines=custom_guidelines
         )
         
         # Generate the artwork
@@ -84,7 +110,6 @@ class DynamicBuilder:
     
     def _choose_base_techniques(self):
         """Let user choose base mathematical techniques"""
-        print("\nChoose base mathematical techniques:")
         categories = {
             'geometry': self.config.technique_categories['geometry'],
             'motion': self.config.technique_categories['motion'],
@@ -98,8 +123,8 @@ class DynamicBuilder:
             
             while True:
                 try:
-                    choices = input(f"\nSelect {category} techniques (comma-separated numbers, or 0 to skip): ")
-                    if choices.strip() == "0":
+                    choices = input(f"\nSelect {category} techniques (comma-separated numbers, 0 or Enter to skip): ")
+                    if not choices.strip() or choices.strip() == "0":
                         break
                         
                     indices = [int(x.strip()) - 1 for x in choices.split(",")]
@@ -109,7 +134,10 @@ class DynamicBuilder:
                 except (ValueError, IndexError):
                     print("Please enter valid numbers")
         
-        print(f"\nSelected techniques: {', '.join(self.selected_techniques)}")
+        if self.selected_techniques:
+            print(f"\nSelected techniques: {', '.join(self.selected_techniques)}")
+        else:
+            print("\nNo specific techniques selected - using AI's creative judgment")
     
     def _choose_motion_style(self) -> str:
         """Choose the overall motion style"""
@@ -124,18 +152,21 @@ class DynamicBuilder:
             "Random and unpredictable"
         ]
         
-        print("\nChoose motion style:")
+        print("\nChoose motion style (press Enter to skip):")
         for i, style in enumerate(styles, 1):
             print(f"{i}. {style}")
             
         while True:
             try:
-                choice = int(input("\nEnter choice (1-8): "))
+                choice = input("\nEnter choice (1-8 or press Enter to skip): ").strip()
+                if not choice:  # Allow empty input to skip
+                    return ""
+                choice = int(choice)
                 if 1 <= choice <= len(styles):
                     return styles[choice - 1]
                 print("Invalid choice")
             except ValueError:
-                print("Please enter a number")
+                print("Please enter a number or press Enter to skip")
     
     def _choose_shape_elements(self) -> str:
         """Choose primary shape elements"""
@@ -150,18 +181,21 @@ class DynamicBuilder:
             "Abstract forms"
         ]
         
-        print("\nChoose primary shapes:")
+        print("\nChoose primary shapes (press Enter to skip):")
         for i, shape in enumerate(shapes, 1):
             print(f"{i}. {shape}")
             
         while True:
             try:
-                choice = int(input("\nEnter choice (1-8): "))
+                choice = input("\nEnter choice (1-8 or press Enter to skip): ").strip()
+                if not choice:  # Allow empty input to skip
+                    return ""
+                choice = int(choice)
                 if 1 <= choice <= len(shapes):
                     return shapes[choice - 1]
                 print("Invalid choice")
             except ValueError:
-                print("Please enter a number")
+                print("Please enter a number or press Enter to skip")
     
     def _choose_color_approach(self) -> str:
         """Choose color scheme approach"""
@@ -176,20 +210,24 @@ class DynamicBuilder:
             "Custom color scheme"
         ]
         
-        print("\nChoose color approach:")
+        print("\nChoose color approach (press Enter to skip):")
         for i, approach in enumerate(approaches, 1):
             print(f"{i}. {approach}")
             
         while True:
             try:
-                choice = int(input("\nEnter choice (1-8): "))
+                choice = input("\nEnter choice (1-8 or press Enter to skip): ").strip()
+                if not choice:  # Allow empty input to skip
+                    return ""
+                choice = int(choice)
                 if 1 <= choice <= len(approaches):
                     if choice == 8:
-                        return input("\nDescribe your custom color scheme: ")
+                        custom = input("\nDescribe your custom color scheme (or press Enter to skip): ").strip()
+                        return custom if custom else ""
                     return approaches[choice - 1]
                 print("Invalid choice")
             except ValueError:
-                print("Please enter a number")
+                print("Please enter a number or press Enter to skip")
     
     def _choose_pattern_type(self) -> str:
         """Choose overall pattern type"""
@@ -204,31 +242,38 @@ class DynamicBuilder:
             "Flow field patterns"
         ]
         
-        print("\nChoose pattern type:")
+        print("\nChoose pattern type (press Enter to skip):")
         for i, pattern in enumerate(patterns, 1):
             print(f"{i}. {pattern}")
             
         while True:
             try:
-                choice = int(input("\nEnter choice (1-8): "))
+                choice = input("\nEnter choice (1-8 or press Enter to skip): ").strip()
+                if not choice:  # Allow empty input to skip
+                    return ""
+                choice = int(choice)
                 if 1 <= choice <= len(patterns):
                     return patterns[choice - 1]
                 print("Invalid choice")
             except ValueError:
-                print("Please enter a number")
+                print("Please enter a number or press Enter to skip")
     
-    def _build_creative_prompt(self, motion: str, shapes: str, colors: str, pattern: str) -> str:
+    def _build_creative_prompt(self, motion: str, shapes: str, colors: str, pattern: str, custom_guidelines: str = "") -> dict:
         """Build the creative prompt from selected options"""
-        # Just build the core creative direction - each model will handle its own formatting
-        return {
+        prompt = {
             "techniques": self.selected_techniques,
             "motion_style": motion,
             "shape_elements": shapes,
             "color_approach": colors,
-            "pattern_type": pattern
+            "pattern_type": pattern,
         }
+        
+        if custom_guidelines:
+            prompt["custom_guidelines"] = custom_guidelines
+            
+        return prompt
     
-    def _generate_artwork(self, prompt_data: dict) -> bool:
+    def _generate_artwork(self, prompt_data: dict) -> Optional[Pattern]:
         """Generate the artwork using the built prompt"""
         try:
             # Get next version
@@ -245,57 +290,80 @@ class DynamicBuilder:
                 generator.current_model = self.selected_model
             else:
                 self.log.error(f"Invalid model selected: {self.selected_model}")
-                return False
+                return None
             
             # Add retry logic for generation
             max_retries = 3
             for attempt in range(max_retries):
-                self.log.info(f"Generation attempt {attempt + 1}/{max_retries}")
+                if attempt > 0:
+                    self.log.info(f"Generation attempt {attempt+1}/{max_retries}")
                 
-                # Generate code using selected model
-                code = generator.generate_with_wizard(prompt_data)  # Use wizard-specific method
-                if code:
-                    # Build full template
-                    final_code = generator.build_processing_template(code, next_version)
+                # Generate the code
+                code = generator.generate_code(prompt_data)
+                if not code:
+                    if attempt < max_retries - 1:
+                        continue
+                    self.log.error("Failed to generate valid code")
+                    return None
+                
+                # Build the template
+                final_code = generator.build_processing_template(code, next_version)
+                
+                # Save the code
+                with open(self.config.paths['template'], 'w') as f:
+                    f.write(final_code)
+                
+                # Run the sketch
+                render_path = f"render_v{next_version}"
+                success = self._run_sketch(render_path)
+                
+                if success:
+                    # Create pattern object
+                    pattern = Pattern(
+                        version=next_version,
+                        code=code,
+                        timestamp=datetime.now(),
+                        techniques=self.selected_techniques
+                    )
                     
-                    # Save the code
-                    template_path = Path(self.config.paths['template'])
-                    template_path.parent.mkdir(parents=True, exist_ok=True)
-                    template_path.write_text(final_code)
+                    # Score and save pattern
+                    scores = self.generator.score_pattern(pattern)
+                    pattern.update_scores(scores)
+                    self.db.save_pattern(pattern)
                     
-                    # Create render directory
-                    render_path = Path(f"render_v{next_version}")
-                    
-                    # Use the existing pipeline to run the sketch
-                    success, error = self.generator.run_sketch(render_path)
-                    
-                    if success:
-                        # Create and save pattern
-                        pattern = Pattern(
-                            version=next_version,
-                            code=code,
-                            timestamp=datetime.now(),
-                            techniques=self.selected_techniques
-                        )
-                        
-                        # Score and save
-                        scores = self.generator.score_pattern(pattern)
-                        pattern.update_scores(scores)
-                        self.db.save_pattern(pattern)
-                        
-                        self.log.success(f"Successfully created dynamic artwork using {self.selected_model}")
-                        return True
-                    else:
-                        self.log.warning(f"Sketch execution failed on attempt {attempt + 1}: {error if error else 'Unknown error'}")
-                else:
-                    self.log.warning(f"Code generation failed on attempt {attempt + 1}")
+                    self.log.success(f"Successfully created dynamic artwork using {self.selected_model}")
+                    return pattern
                 
                 if attempt < max_retries - 1:
-                    self.log.info("Retrying with different parameters...")
+                    continue
+                
+                self.log.error("Failed to run sketch")
+                return None
             
-            self.log.error(f"Failed to generate valid code after {max_retries} attempts")
-            return False
+            return None
             
         except Exception as e:
             self.log.error(f"Error generating artwork: {e}")
+            if self.config.debug_mode:
+                import traceback
+                self.log.debug(traceback.format_exc())
+            return None
+
+    def _run_sketch(self, render_path: str) -> bool:
+        """Run the Processing sketch and wait for completion"""
+        try:
+            # Create render directory
+            Path(render_path).mkdir(parents=True, exist_ok=True)
+            
+            # Use the generator's run_sketch method
+            success, error = self.generator.run_sketch(Path(render_path))
+            if not success and error:
+                self.log.error(f"Sketch error: {error}")
+            return success
+            
+        except Exception as e:
+            self.log.error(f"Error running sketch: {e}")
+            if self.config.debug_mode:
+                import traceback
+                self.log.debug(traceback.format_exc())
             return False 

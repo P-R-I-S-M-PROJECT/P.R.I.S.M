@@ -31,6 +31,9 @@ class Config:
         self.data_dir = self.base_path / "data"
         self.data_dir.mkdir(exist_ok=True)
         
+        # Debug mode flag
+        self.debug_mode = False
+        
         # Model configuration
         self.model_config = {
             'available_models': ['o1', 'o1-mini', '4o', 'claude-3-opus', 'claude-3.5-sonnet', 'flux'],
