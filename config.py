@@ -163,6 +163,24 @@ class Config:
                 'geometric', 'organic', 'recursive', 'fractal',
                 'symmetrical', 'random', 'grid-based', 'flowing'
             ],
+            'illusion_types': {
+                'motion_illusions': [
+                    'spinning_spiral', 'motion_binding', 'peripheral_drift',
+                    'rotating_snakes', 'motion_aftereffect', 'wagon_wheel'
+                ],
+                'geometric_illusions': [
+                    'impossible_shapes', 'cafe_wall', 'muller_lyer',
+                    'penrose_triangle', 'necker_cube', 'fraser_spiral'
+                ],
+                'color_illusions': [
+                    'simultaneous_contrast', 'color_constancy', 'chromatic_aberration',
+                    'color_assimilation', 'watercolor_effect', 'bezold_effect'
+                ],
+                'cognitive_illusions': [
+                    'ambiguous_figures', 'hidden_patterns', 'gestalt_principles',
+                    'pareidolia', 'anamorphic_art', 'stereograms'
+                ]
+            },
             'interaction_modes': [
                 'autonomous', 'reactive', 'progressive', 'cyclical',
                 'generative', 'evolutionary', 'harmonic', 'chaotic'
