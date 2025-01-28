@@ -109,7 +109,7 @@ class MenuManager:
                         self.prism.generator,
                         self.prism.db
                     )
-                self.dynamic_builder.show_creation_wizard(model_name=current_model)
+                self.show_wizard_mode_menu(current_model)
                 input("\nPress Enter to continue...")
             elif choice == "2":  # Automated Evolution
                 self.show_generation_menu()
@@ -121,6 +121,107 @@ class MenuManager:
             else:
                 print("\nInvalid choice. Please try again.")
     
+    def show_wizard_mode_menu(self, current_model):
+        """Show wizard mode selection menu"""
+        while True:
+            self.log.title("WIZARD MODE")
+            print(f"\nCurrent Model: {current_model}")
+            
+            print("\nSelect Mode:")
+            print("1. Standard Mode (Direct Creation)")
+            print("2. Refinement Mode (Iterative Creation)")
+            print("3. Back to Creation Mode")
+            
+            choice = input("\nEnter your choice (1-3): ")
+            
+            if choice == "1":  # Standard Mode
+                self.show_standard_mode(current_model)
+                break
+            elif choice == "2":  # Refinement Mode
+                self.show_refinement_mode(current_model)
+                break
+            elif choice == "3":
+                break
+            else:
+                print("\nInvalid choice. Please try again.")
+
+    def show_standard_mode(self, current_model):
+        """Show standard mode interface with batch creation option"""
+        while True:
+            self.log.title("STANDARD MODE")
+            print(f"\nCurrent Model: {current_model}")
+            
+            print("\nCreation Options:")
+            print("1. Create Single Piece")
+            print("2. Create Multiple Pieces")
+            print("3. Back to Wizard Mode")
+            
+            choice = input("\nEnter your choice (1-3): ")
+            
+            if choice == "1":  # Single piece
+                pattern = self.dynamic_builder.show_creation_wizard(model_name=current_model)
+                if pattern:
+                    self.log.success("Pattern created successfully")
+                break
+            elif choice == "2":  # Multiple pieces
+                try:
+                    count = int(input("\nHow many pieces would you like to create? (1-10): "))
+                    if 1 <= count <= 10:
+                        for i in range(count):
+                            self.log.info(f"\nCreating piece {i+1} of {count}")
+                            pattern = self.dynamic_builder.show_creation_wizard(model_name=current_model)
+                            if pattern:
+                                self.log.success(f"Pattern {i+1} created successfully")
+                            else:
+                                self.log.error(f"Failed to create pattern {i+1}")
+                        break
+                    else:
+                        print("Please enter a number between 1 and 10")
+                except ValueError:
+                    print("Please enter a valid number")
+            elif choice == "3":
+                break
+            else:
+                print("\nInvalid choice. Please try again.")
+
+    def show_refinement_mode(self, current_model):
+        """Show refinement mode interface"""
+        while True:
+            self.log.title("REFINEMENT MODE")
+            print(f"\nCurrent Model: {current_model}")
+            
+            # Create initial piece
+            pattern = self.dynamic_builder.show_creation_wizard(model_name=current_model)
+            if pattern is None:
+                print("\nFailed to create initial piece")
+                break
+                
+            while True:
+                print("\nRefinement Options:")
+                print("1. Keep this version")
+                print("2. Modify and try again")
+                print("3. Start over")
+                print("4. Back to Wizard Mode")
+                
+                choice = input("\nEnter your choice (1-4): ")
+                
+                if choice == "1":  # Keep version
+                    self.log.success("Pattern saved successfully")
+                    return
+                elif choice == "2":  # Modify
+                    # Create variation of current pattern
+                    render_dir = self.config.base_path / f"renders/render_v{pattern.version}"
+                    if render_dir.exists():
+                        self.prism.variation_manager._create_dynamic_variation(render_dir)
+                    else:
+                        self.log.error(f"Could not find render directory: {render_dir}")
+                elif choice == "3":  # Start over
+                    break  # Break inner loop to create new pattern
+                elif choice == "4":  # Back to menu
+                    return
+                else:
+                    print("\nInvalid choice. Please try again.")
+
     def show_generation_menu(self):
         """Show automated generation options menu"""
         while True:

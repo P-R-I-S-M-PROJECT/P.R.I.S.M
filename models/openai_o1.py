@@ -545,4 +545,27 @@ Return your code between these markers:
 // END OF YOUR CREATIVE CODE"""
 
         # Use the standard generation pipeline with the wizard prompt
-        return self.generate_with_ai(full_prompt, skip_generation_prompt=True) 
+        return self.generate_with_ai(full_prompt, skip_generation_prompt=True)
+
+    def generate_code(self, prompt_data: dict) -> Optional[str]:
+        """Generate code using the wizard prompt data"""
+        try:
+            # Build creative prompt from wizard data
+            creative_prompt = f"""Create a dynamic Processing animation with these characteristics:
+
+Base Techniques: {', '.join(prompt_data['techniques'])}
+Motion Style: {prompt_data['motion_style']}
+Shape Elements: {prompt_data['shape_elements']}
+Color Approach: {prompt_data['color_approach']}
+Pattern Type: {prompt_data['pattern_type']}
+
+Focus on smooth animation and visual harmony.
+Use the progress variable (0.0 to 1.0) for animation timing.
+Keep the code modular and efficient."""
+
+            # Generate code using the creative prompt
+            return self.generate_with_ai(creative_prompt)
+            
+        except Exception as e:
+            self.log.error(f"Error in code generation: {str(e)}")
+            return None 
