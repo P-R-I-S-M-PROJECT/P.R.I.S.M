@@ -38,15 +38,40 @@ class OpenAIO1Generator:
             if skip_generation_prompt:
                 full_prompt = prompt
             else:
-                # Build a focused creative prompt
-                structured_prompt = self._build_generation_prompt(prompt)
-                
-                # Add artistic context prefix
-                context = """You're a creative coder crafting generative art with Processing. 
-Express your artistic vision through code - feel free to experiment and innovate.
-Just remember to use Processing's Java-style syntax as your medium."""
-                
-                full_prompt = context + "\n\n" + structured_prompt
+                # Add the O1-specific framework around the creative prompt
+                full_prompt = f"""=== PROCESSING SKETCH GENERATOR ===
+Create a visually appealing animation that loops smoothly over 6 seconds.
+Let your creativity guide the direction - feel free to explore and experiment.
+
+=== REQUIRED FUNCTIONS ===
+You MUST define these two functions:
+1. void initSketch() - Called once at start
+2. void runSketch(float progress) - Called each frame with progress (0.0 to 1.0)
+
+=== SYSTEM FRAMEWORK ===
+The system automatically handles these - DO NOT include them:
+• void setup() or draw() functions
+• size(1080, 1080) and frameRate settings
+• background(0) or any background clearing
+• translate(width/2, height/2) for centering
+• Frame saving and program exit
+
+=== CODE STRUCTURE ===
+1. Define any classes at the top
+2. Declare global variables
+3. Define initSketch() for setup
+4. Define runSketch(progress) for animation
+• The canvas is already centered at (0,0)
+• Initialize all variables with values
+• Use RGB values for colors (e.g., stroke(255, 0, 0) for red)
+
+=== CREATIVE DIRECTION ===
+{prompt}
+
+=== RETURN FORMAT ===
+Return your code between these markers:
+// YOUR CREATIVE CODE GOES HERE
+// END OF YOUR CREATIVE CODE"""
             
             # Log the full prompt being sent
             self.log.debug(f"\n=== SENDING TO AI ===\n{full_prompt}\n==================\n")
@@ -204,13 +229,20 @@ Return your code between these markers:
             code = re.sub(r'void\s+draw\s*\(\s*\)\s*{[^}]*}', '', code)
             
             # Remove any system calls that are handled by the framework
-            code = re.sub(r'\s*background\([^)]*\);', '', code)
-            code = re.sub(r'\s*size\([^)]*\);', '', code)
-            code = re.sub(r'\s*frameRate\([^)]*\);', '', code)
-            code = re.sub(r'\s*translate\(width/2[^)]*\);', '', code)
-            code = re.sub(r'\s*translate\(height/2[^)]*\);', '', code)
-            code = re.sub(r'\s*saveFrame\([^)]*\);', '', code)
-            code = re.sub(r'\s*exit\(\);', '', code)
+            code = re.sub(r'\bbackground\s*\([^)]*\);', '', code)
+            code = re.sub(r'\bsize\s*\([^)]*\);', '', code)
+            code = re.sub(r'\bframeRate\s*\([^)]*\);', '', code)
+            code = re.sub(r'\btranslate\s*\(\s*width\s*/\s*2[^)]*\);', '', code)
+            code = re.sub(r'\btranslate\s*\(\s*height\s*/\s*2[^)]*\);', '', code)
+            code = re.sub(r'\bsaveFrame\s*\([^)]*\);', '', code)
+            code = re.sub(r'\bexit\s*\(\s*\);', '', code)
+            
+            # Fix common syntax issues
+            code = re.sub(r'(\w+)\s*\.\s*(\w+)', r'\1.\2', code)  # Fix spaced dots
+            code = re.sub(r'for\s*\(\s*int\s+(\w+)\s*=\s*0\s*;\s*\1\s*<\s*(\w+)\s*\.\s*(\w+)\s*;', r'for (int \1 = 0; \1 < \2.\3;', code)  # Fix for loop syntax
+            
+            # Fix malformed function declarations where comments merge with function
+            code = re.sub(r'([^\n]+)void\s+(\w+)\s*\(', r'\1\nvoid \2(', code)
             
             # Clean up empty lines and whitespace
             code = re.sub(r'\n\s*\n\s*\n', '\n\n', code)
@@ -218,9 +250,9 @@ Return your code between these markers:
             
             # Only add missing functions for non-variation code
             if not is_variation:
-                if 'void initSketch()' not in code:
+                if not re.search(r'\bvoid\s+initSketch\s*\(\s*\)', code):
                     code += '\n\nvoid initSketch() {\n  // Initialize sketch\n}'
-                if 'void runSketch(float progress)' not in code:
+                if not re.search(r'\bvoid\s+runSketch\s*\(\s*float\s+\w+\s*\)', code):
                     code += '\n\nvoid runSketch(float progress) {\n  // Update sketch\n}'
             
             return code
@@ -270,41 +302,41 @@ Return your code between these markers:
             return code
 
     def validate_creative_code(self, code: str, is_snippet: bool = False) -> tuple[bool, str]:
-        """Validate creative code requirements.
-        
-        Args:
-            code: The code to validate
-            is_snippet: Whether this is a snippet for variation (vs full PDE)
-        """
+        """Validate creative code for forbidden elements"""
         if not code.strip():
             return False, "Empty code"
-
-        # For snippets (variations), only check for forbidden system functions
-        if is_snippet:
-            # Check for system functions that shouldn't be in snippets
-            forbidden = ['void setup()', 'void draw()', 'size(', 'frameRate(', 'saveFrame(']
-            for term in forbidden:
-                if term in code:
-                    return False, f"Snippet contains system function: {term}"
-            
-            return True, None
-            
-        # For full PDE generation, validate core requirements
-        return self.validate_core_requirements(code)
-
-    def validate_core_requirements(self, code: str) -> tuple[bool, str]:
-        """Validate only essential Processing code requirements, being more lenient"""
-        # Only validate the critical template structure
-        required_structure = [
-            (r'void setup\(\)\s*{[^}]*size\(1080,\s*1080\)[^}]*}', "setup() function modified"),
-            (r'void draw\(\)\s*{.*background\(0\).*translate\(width/2,\s*height/2\)', "draw() function header modified"),
-            (r'String\s+renderPath\s*=\s*"renders/render_v\d+"', "renderPath declaration missing/modified"),
-            (r'saveFrame\(renderPath\s*\+\s*"/frame-####\.png"\)', "saveFrame call missing/modified")
+        
+        # Check for critical system-level functions that would break the sketch
+        # Use more precise patterns to avoid false positives
+        critical_forbidden = {
+            r'(?<!\.)\bsize\s*\(': 'Contains size() call',  # Negative lookbehind to avoid matching list.size()
+            r'(?<!\.)\bbackground\s*\(': 'Contains background() call',
+            r'(?<!\.)\bframeRate\s*\(': 'Contains frameRate() call',
+            r'(?<!\.)\bdraw\s*\(\s*\)': 'Contains draw() function',  # Match function definition
+        }
+        
+        # Check for critical forbidden elements with better pattern matching
+        for pattern, error in critical_forbidden.items():
+            if re.search(pattern, code):
+                return False, error
+        
+        # Check for absolute translations that would re-center the origin
+        translation_patterns = [
+            r'translate\s*\(\s*width\s*/\s*2',
+            r'translate\s*\(\s*height\s*/\s*2',
         ]
         
-        for pattern, error in required_structure:
-            if not re.search(pattern, code, re.DOTALL):
-                return False, error
+        for line in code.split('\n'):
+            line = line.strip()
+            if any(re.search(pattern, line) for pattern in translation_patterns):
+                return False, "Contains origin re-centering - coordinates are already centered"
+        
+        # For non-snippets, ensure required functions exist with proper signatures
+        if not is_snippet:
+            if not re.search(r'\bvoid\s+initSketch\s*\(\s*\)', code):
+                return False, "Missing initSketch() function"
+            if not re.search(r'\bvoid\s+runSketch\s*\(\s*float\s+\w+\s*\)', code):
+                return False, "Missing runSketch(float progress) function"
         
         return True, None
 
@@ -349,7 +381,20 @@ Return your code between these markers:
             "// END OF YOUR CREATIVE CODE"
         )
         
-        # Only check for critical JavaScript syntax that can't be auto-fixed
+        # Check for basic syntax errors
+        syntax_errors = [
+            (r'for\s*\([^)]*\.\s*\w+\)', "Invalid for loop syntax"),
+            (r'while\s*\([^)]*\.\s*\w+\)', "Invalid while loop syntax"),
+            (r'\w+\s+\.\s*\w+\s*\(', "Invalid method call syntax with space before dot"),
+            (r'\w+\s*\.\s*$', "Incomplete object reference"),
+            (r'\w+\s*\.\s*\)', "Invalid object reference in parentheses")
+        ]
+        
+        for pattern, error in syntax_errors:
+            if re.search(pattern, user_code):
+                errors.append(error)
+        
+        # Check for critical JavaScript syntax that can't be auto-fixed
         critical_js_patterns = [
             (r'color\(([\'"]#[0-9a-fA-F]+[\'"]\))', "Use RGB values instead of hex codes: color(255, 0, 0)"),
             (r'\b(push|pop)\s*\(\s*\)', "Use pushMatrix()/popMatrix() instead of push()/pop()"),
@@ -362,7 +407,7 @@ Return your code between these markers:
         
         if errors:
             error_msg = "\n• ".join(errors)
-            self.log.error(f"Critical JavaScript syntax found:\n• {error_msg}")
+            self.log.error(f"Code validation errors found:\n• {error_msg}")
             return False
         
         return True
@@ -446,3 +491,58 @@ void draw() {{
         exit();
     }}
 }}"""  # Note: Added closing triple quote and removed trailing space 
+
+    def generate_with_wizard(self, prompt_data: dict) -> Optional[str]:
+        """Generate code using wizard-provided parameters"""
+        techniques_str = ", ".join(prompt_data["techniques"])
+        
+        # Build creative direction section
+        creative_direction = f"""Create a dynamic Processing animation with these characteristics:
+
+Base Techniques: {techniques_str}
+Motion Style: {prompt_data["motion_style"]}
+Shape Elements: {prompt_data["shape_elements"]}
+Color Approach: {prompt_data["color_approach"]}
+Pattern Type: {prompt_data["pattern_type"]}
+
+Focus on smooth animation and visual harmony.
+Use the progress variable (0.0 to 1.0) for animation timing.
+Keep the code modular and efficient."""
+
+        # Add O1-specific framework
+        full_prompt = f"""=== PROCESSING SKETCH GENERATOR ===
+Create a visually appealing animation that loops smoothly over 6 seconds.
+Let your creativity guide the direction - feel free to experiment and innovate.
+
+=== REQUIRED FUNCTIONS ===
+You MUST define these two functions:
+1. void initSketch() - Called once at start
+2. void runSketch(float progress) - Called each frame with progress (0.0 to 1.0)
+
+=== SYSTEM FRAMEWORK ===
+The system automatically handles these - DO NOT include them:
+• void setup() or draw() functions
+• size(1080, 1080) and frameRate settings
+• background(0) or any background clearing
+• translate(width/2, height/2) for centering
+• Frame saving and program exit
+
+=== CODE STRUCTURE ===
+1. Define any classes at the top
+2. Declare global variables
+3. Define initSketch() for setup
+4. Define runSketch(progress) for animation
+• The canvas is already centered at (0,0)
+• Initialize all variables with values
+• Use RGB values for colors (e.g., stroke(255, 0, 0) for red)
+
+=== CREATIVE DIRECTION ===
+{creative_direction}
+
+=== RETURN FORMAT ===
+Return your code between these markers:
+// YOUR CREATIVE CODE GOES HERE
+// END OF YOUR CREATIVE CODE"""
+
+        # Use the standard generation pipeline with the wizard prompt
+        return self.generate_with_ai(full_prompt, skip_generation_prompt=True) 

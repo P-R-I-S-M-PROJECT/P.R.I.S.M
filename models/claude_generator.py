@@ -263,6 +263,10 @@ Return your code between these markers:
         try:
             # Apply basic cleaning
             code = self._remove_system_calls(code)
+            
+            # Fix malformed function declarations where comments merge with function
+            code = re.sub(r'([^\n]+)void\s+(\w+)\s*\(', r'\1\nvoid \2(', code)
+            
             code = code.strip()
             
             # Ensure required functions exist
