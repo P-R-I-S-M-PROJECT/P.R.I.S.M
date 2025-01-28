@@ -8,6 +8,7 @@ from models import Pattern
 import json
 import subprocess
 import time
+import re
 
 class DynamicBuilder:
     def __init__(self, config: Config, log: ArtLogger, generator, db):
@@ -19,6 +20,11 @@ class DynamicBuilder:
         self.current_innovation = 0.5
         self.selected_techniques = []
         self.selected_model = None
+        self.selected_illusions = []  # Store selected illusions for multiple generations
+        self.selected_motion_styles = []  # Store selected motion styles
+        self.selected_shapes = []  # Store selected shapes
+        self.selected_colors = []  # Store selected color approaches
+        self.selected_patterns = []  # Store selected pattern types
         
     def show_creation_wizard(self, model_name: str = None):
         """Guide user through creating a dynamic artwork"""
@@ -38,8 +44,9 @@ class DynamicBuilder:
         print("2. Geometric Transformations (shape morphing)")
         print("3. Pattern Generation (recursive/emergent)")
         print("4. Text Art (shape-based/organic)")
-        print("5. Custom Guidelines")
-        print("\nEnter choice (1-5) or press Enter to skip: ")
+        print("5. Optical Illusions & Visual Puzzles")
+        print("6. Custom Guidelines")
+        print("\nEnter choice (1-6) or press Enter to skip: ")
         mode_choice = input().strip()
         
         custom_guidelines = ""
@@ -110,18 +117,113 @@ class DynamicBuilder:
                 text_style = input().strip()
                 
                 text_styles = {
-                    "1": f"Form the text '{desired_text}' using dynamic particle systems that assemble and flow",
-                    "2": f"Fill the text '{desired_text}' with intricate patterns and motion",
-                    "3": f"Create the text '{desired_text}' that emerges from underlying patterns",
-                    "4": f"Transform flowing shapes that morph into the text '{desired_text}'"
+                    "1": f"Create text '{desired_text}' using dynamic particle systems that assemble and flow",
+                    "2": f"Create text '{desired_text}' filled with intricate patterns and motion",
+                    "3": f"Create text '{desired_text}' that emerges from underlying patterns",
+                    "4": f"Create text '{desired_text}' through transforming flowing shapes that morph"
                 }
-                custom_guidelines = text_styles.get(text_style, f"Create organic text spelling '{desired_text}' through shape-based patterns and dynamic motion")
+                custom_guidelines = text_styles.get(text_style, f"Create text '{desired_text}' through shape-based patterns and dynamic motion")
                 
                 # Append extra instructions if provided
                 if extra_instructions:
-                    custom_guidelines += f"\nAdditional Requirements: {extra_instructions}"
+                    custom_guidelines += f". Additional Requirements: {extra_instructions}"
             
-            elif mode_choice == "5":  # Custom Guidelines
+            elif mode_choice == "5":  # Optical Illusions
+                print("\nOptical Illusion Categories:")
+                print("1. Motion Illusions (spinning, drifting effects)")
+                print("2. Geometric Illusions (impossible shapes)")
+                print("3. Color Illusions (contrast, afterimages)")
+                print("4. Cognitive Illusions (ambiguous figures)")
+                print("\nFormat: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
+                
+                illusion_type = input("\nChoose illusion categories: ").strip()
+                
+                illusion_types = {
+                    "1": {
+                        "name": "Motion Illusions",
+                        "options": [
+                            "Spinning Spiral (hypnotic rotation effect)",
+                            "Peripheral Drift (subtle motion in periphery)",
+                            "Motion Aftereffect (waterfall illusion)",
+                            "Rotating Snakes (illusory rotation)",
+                        ]
+                    },
+                    "2": {
+                        "name": "Geometric Illusions",
+                        "options": [
+                            "Impossible Shapes (paradoxical structures)",
+                            "Cafe Wall (parallel lines appear sloped)",
+                            "Penrose Triangle (impossible triangle)",
+                            "Necker Cube (ambiguous perspective)",
+                        ]
+                    },
+                    "3": {
+                        "name": "Color Illusions",
+                        "options": [
+                            "Simultaneous Contrast (color perception changes)",
+                            "Color Afterimage (complementary color effect)",
+                            "Chromatic Aberration (color splitting)",
+                            "Bezold Effect (color spreading)",
+                        ]
+                    },
+                    "4": {
+                        "name": "Cognitive Illusions",
+                        "options": [
+                            "Ambiguous Figures (multiple interpretations)",
+                            "Hidden Patterns (emergent images)",
+                            "Gestalt Patterns (whole vs parts)",
+                            "Anamorphic Art (perspective-dependent)",
+                        ]
+                    }
+                }
+                
+                if illusion_type:
+                    indices = self._parse_range_selection(illusion_type, 4)
+                    if indices:
+                        # Convert 0-based indices to 1-based category numbers
+                        categories = [str(i + 1) for i in indices]
+                        
+                        # For each selected category, show its options and get specific choices
+                        selected_illusions = []
+                        for cat_num in categories:
+                            if cat_num in illusion_types:
+                                category = illusion_types[cat_num]
+                                print(f"\n{category['name']} Options:")
+                                for i, option in enumerate(category['options'], 1):
+                                    print(f"{i}. {option}")
+                                
+                                specific_choice = input(f"\nChoose specific {category['name'].lower()} (same format as above): ").strip()
+                                
+                                if specific_choice:
+                                    sub_indices = self._parse_range_selection(specific_choice, len(category['options']))
+                                    if sub_indices:
+                                        # Add all selected illusions from this category
+                                        for idx in sub_indices:
+                                            illusion = category['options'][idx].split(" (")[0]
+                                            self.selected_illusions.append((category['name'], illusion))
+                
+                        if self.selected_illusions:
+                            # Randomly select one illusion from all chosen ones for each piece
+                            cat_name, chosen_illusion = random.choice(self.selected_illusions)
+                            custom_guidelines = f"Create a dynamic optical illusion using the {chosen_illusion.lower()} technique. "
+                            custom_guidelines += "Focus on creating a strong visual effect that challenges perception. "
+                            custom_guidelines += "Ensure the illusion is clear and effective, with smooth transitions and proper timing for maximum impact."
+                        else:
+                            # If no specific illusions were chosen, use all selected categories
+                            cat_names = [illusion_types[c]['name'] for c in categories]
+                            custom_guidelines = f"Create a dynamic optical illusion combining elements from the following categories: {', '.join(cat_names)}. "
+                            custom_guidelines += "Choose the most effective techniques to create compelling visual effects. "
+                            custom_guidelines += "Focus on strong perceptual impact and smooth execution."
+                    else:
+                        custom_guidelines = "Create a dynamic optical illusion using any suitable technique. "
+                        custom_guidelines += "Choose the most effective approach to create a compelling visual effect. "
+                        custom_guidelines += "Focus on strong perceptual impact and smooth execution."
+                else:
+                    custom_guidelines = "Create a dynamic optical illusion using any suitable technique. "
+                    custom_guidelines += "Choose the most effective approach to create a compelling visual effect. "
+                    custom_guidelines += "Focus on strong perceptual impact and smooth execution."
+            
+            elif mode_choice == "6":  # Custom Guidelines
                 print("\nEnter your custom creative guidelines:")
                 custom_guidelines = input().strip()
         
@@ -149,15 +251,44 @@ class DynamicBuilder:
                 return self._generate_artwork(prompt)
         
         # Step 1: Choose base techniques
-        print("\nChoose base mathematical techniques (press Enter at each step to skip):")
-        self._choose_base_techniques()
+        print("\nChoose base mathematical techniques")
+        print("---------------------------")
+        print("You can select specific techniques for each category, or press Enter to skip.")
+        print("Format: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
+        print("\nIf you skip all categories, the AI will intelligently select techniques based on:")
+        print("• Your custom guidelines and creative direction")
+        print("• Historical performance data")
+        print("• Technique synergy patterns")
+        print("• The chosen creative mode (static vs. dynamic)\n")
+        
+        categories = {
+            'geometry': self.config.technique_categories['geometry'],
+            'motion': self.config.technique_categories['motion'],
+            'patterns': self.config.technique_categories['patterns']
+        }
+            
+        for category, techniques in categories.items():
+            print(f"\n{category.title()} Techniques:")
+            for i, technique in enumerate(techniques, 1):
+                print(f"{i}. {technique}")
+            
+            choices = input(f"\nSelect {category} techniques: ").strip()
+            if choices:
+                indices = self._parse_range_selection(choices, len(techniques))
+                selected = [techniques[i] for i in indices]
+                self.selected_techniques.extend(selected)
+        
+        if self.selected_techniques:
+            print(f"\nSelected techniques: {', '.join(self.selected_techniques)}")
+        else:
+            print("\nNo specific techniques selected - AI will analyze your requirements and select optimal techniques")
         
         # Step 2: Choose motion style
         motion_style = self._choose_motion_style()
         
         # Step 3: Choose shape elements
         shape_elements = self._choose_shape_elements()
-        
+            
         # Step 4: Choose color approach
         color_approach = self._choose_color_approach()
         
@@ -200,45 +331,46 @@ class DynamicBuilder:
                 break
             print("Invalid choice")
     
-    def _choose_base_techniques(self):
-        """Let user choose base mathematical techniques"""
-        print("\nBase Mathematical Techniques")
-        print("---------------------------")
-        print("You can select specific techniques for each category, or press Enter to skip.")
-        print("If you skip all categories, the AI will intelligently select techniques based on:")
-        print("• Your custom guidelines and creative direction")
-        print("• Historical performance data")
-        print("• Technique synergy patterns")
-        print("• The chosen creative mode (static vs. dynamic)\n")
+    def _parse_range_selection(self, selection: str, max_value: int) -> list:
+        """Parse a range selection string into a list of integers.
         
-        categories = {
-            'geometry': self.config.technique_categories['geometry'],
-            'motion': self.config.technique_categories['motion'],
-            'patterns': self.config.technique_categories['patterns']
-        }
+        Supports formats:
+        - Single numbers: "1", "2"
+        - Comma-separated: "1,2,3"
+        - Ranges: "1-3" or "1,3-5"
+        - "all" or empty for all options
         
-        for category, techniques in categories.items():
-            print(f"\n{category.title()} Techniques:")
-            for i, technique in enumerate(techniques, 1):
-                print(f"{i}. {technique}")
+        Args:
+            selection: Input string to parse
+            max_value: Maximum allowed value (inclusive)
             
-            while True:
-                try:
-                    choices = input(f"\nSelect {category} techniques (comma-separated numbers, Enter to skip): ")
-                    if not choices.strip():
-                        break
-                        
-                    indices = [int(x.strip()) - 1 for x in choices.split(",")]
-                    selected = [techniques[i] for i in indices if 0 <= i < len(techniques)]
-                    self.selected_techniques.extend(selected)
-                    break
-                except (ValueError, IndexError):
-                    print("Please enter valid numbers")
+        Returns:
+            List of selected indices (0-based)
+        """
+        if not selection.strip() or selection.lower() == "all":
+            return list(range(max_value))
+            
+        selected = set()
+        parts = selection.split(",")
         
-        if self.selected_techniques:
-            print(f"\nSelected techniques: {', '.join(self.selected_techniques)}")
-        else:
-            print("\nNo specific techniques selected - AI will analyze your requirements and select optimal techniques")
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+                
+            try:
+                if "-" in part:
+                    start, end = map(int, part.split("-"))
+                    if 1 <= start <= end <= max_value:
+                        selected.update(range(start-1, end))
+                else:
+                    num = int(part)
+                    if 1 <= num <= max_value:
+                        selected.add(num-1)
+            except ValueError:
+                continue
+                
+        return sorted(list(selected))
     
     def _choose_motion_style(self) -> str:
         """Choose the overall motion style"""
@@ -253,21 +385,23 @@ class DynamicBuilder:
             "Random and unpredictable"
         ]
         
-        print("\nChoose motion style (press Enter to skip):")
+        print("\nChoose motion style:")
+        print("Format: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
+        
         for i, style in enumerate(styles, 1):
             print(f"{i}. {style}")
             
-        while True:
-            try:
-                choice = input("\nEnter choice (1-8 or press Enter to skip): ").strip()
-                if not choice:  # Allow empty input to skip
-                    return ""
-                choice = int(choice)
-                if 1 <= choice <= len(styles):
-                    return styles[choice - 1]
-                print("Invalid choice")
-            except ValueError:
-                print("Please enter a number or press Enter to skip")
+        choice = input("\nEnter selection: ").strip()
+        if not choice:
+            return ""
+            
+        indices = self._parse_range_selection(choice, len(styles))
+        if indices:
+            # Store all selected styles
+            self.selected_motion_styles = [styles[i] for i in indices]
+            # For this generation, randomly select one
+            return random.choice(self.selected_motion_styles)
+        return ""
     
     def _choose_shape_elements(self) -> str:
         """Choose primary shape elements"""
@@ -282,21 +416,23 @@ class DynamicBuilder:
             "Abstract forms"
         ]
         
-        print("\nChoose primary shapes (press Enter to skip):")
+        print("\nChoose primary shapes:")
+        print("Format: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
+        
         for i, shape in enumerate(shapes, 1):
             print(f"{i}. {shape}")
             
-        while True:
-            try:
-                choice = input("\nEnter choice (1-8 or press Enter to skip): ").strip()
-                if not choice:  # Allow empty input to skip
-                    return ""
-                choice = int(choice)
-                if 1 <= choice <= len(shapes):
-                    return shapes[choice - 1]
-                print("Invalid choice")
-            except ValueError:
-                print("Please enter a number or press Enter to skip")
+        choice = input("\nEnter selection: ").strip()
+        if not choice:
+            return ""
+            
+        indices = self._parse_range_selection(choice, len(shapes))
+        if indices:
+            # Store all selected shapes
+            self.selected_shapes = [shapes[i] for i in indices]
+            # For this generation, randomly select one
+            return random.choice(self.selected_shapes)
+        return ""
     
     def _choose_color_approach(self) -> str:
         """Choose color scheme approach"""
@@ -311,24 +447,26 @@ class DynamicBuilder:
             "Custom color scheme"
         ]
         
-        print("\nChoose color approach (press Enter to skip):")
+        print("\nChoose color approach:")
+        print("Format: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
+        
         for i, approach in enumerate(approaches, 1):
             print(f"{i}. {approach}")
             
-        while True:
-            try:
-                choice = input("\nEnter choice (1-8 or press Enter to skip): ").strip()
-                if not choice:  # Allow empty input to skip
-                    return ""
-                choice = int(choice)
-                if 1 <= choice <= len(approaches):
-                    if choice == 8:
-                        custom = input("\nDescribe your custom color scheme (or press Enter to skip): ").strip()
-                        return custom if custom else ""
-                    return approaches[choice - 1]
-                print("Invalid choice")
-            except ValueError:
-                print("Please enter a number or press Enter to skip")
+        choice = input("\nEnter selection: ").strip()
+        if not choice:
+            return ""
+            
+        indices = self._parse_range_selection(choice, len(approaches))
+        if indices:
+            # Store all selected approaches
+            self.selected_colors = [approaches[i] for i in indices]
+            selected_approach = random.choice(self.selected_colors)
+            if selected_approach == "Custom color scheme":
+                custom = input("\nDescribe your custom color scheme (or press Enter to skip): ").strip()
+                return custom if custom else ""
+            return selected_approach
+        return ""
     
     def _choose_pattern_type(self) -> str:
         """Choose overall pattern type"""
@@ -343,21 +481,23 @@ class DynamicBuilder:
             "Flow field patterns"
         ]
         
-        print("\nChoose pattern type (press Enter to skip):")
+        print("\nChoose pattern type:")
+        print("Format: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
+        
         for i, pattern in enumerate(patterns, 1):
             print(f"{i}. {pattern}")
             
-        while True:
-            try:
-                choice = input("\nEnter choice (1-8 or press Enter to skip): ").strip()
-                if not choice:  # Allow empty input to skip
-                    return ""
-                choice = int(choice)
-                if 1 <= choice <= len(patterns):
-                    return patterns[choice - 1]
-                print("Invalid choice")
-            except ValueError:
-                print("Please enter a number or press Enter to skip")
+        choice = input("\nEnter selection: ").strip()
+        if not choice:
+            return ""
+            
+        indices = self._parse_range_selection(choice, len(patterns))
+        if indices:
+            # Store all selected patterns
+            self.selected_patterns = [patterns[i] for i in indices]
+            # For this generation, randomly select one
+            return random.choice(self.selected_patterns)
+        return ""
     
     def _build_creative_prompt(self, motion_style: str = "", shape_elements: str = "", color_approach: str = "", pattern_type: str = "", custom_guidelines: str = "") -> dict:
         """Build the creative prompt from selected options"""
@@ -373,6 +513,14 @@ class DynamicBuilder:
         if custom_guidelines:
             # Let the AI interpret and handle the guidelines directly
             prompt["custom_guidelines"] = custom_guidelines
+            
+            # If this is text art, add text-specific information
+            if "text" in custom_guidelines.lower():
+                # Extract the text from the guidelines (assuming format like "Create text 'PRISM'")
+                text_match = re.search(r"text '([^']+)'", custom_guidelines)
+                if text_match:
+                    prompt["text"] = text_match.group(1)
+                    prompt["is_text_art"] = True
             
         return prompt
     
@@ -400,6 +548,25 @@ class DynamicBuilder:
             for attempt in range(max_retries):
                 if attempt > 0:
                     self.log.info(f"Generation attempt {attempt+1}/{max_retries}")
+                
+                # Randomly select new options for each attempt
+                if self.selected_illusions:
+                    cat_name, chosen_illusion = random.choice(self.selected_illusions)
+                    prompt_data["custom_guidelines"] = f"Create a dynamic optical illusion using the {chosen_illusion.lower()} technique. "
+                    prompt_data["custom_guidelines"] += "Focus on creating a strong visual effect that challenges perception. "
+                    prompt_data["custom_guidelines"] += "Ensure the illusion is clear and effective, with smooth transitions and proper timing for maximum impact."
+                
+                if self.selected_motion_styles:
+                    prompt_data["motion_style"] = random.choice(self.selected_motion_styles)
+                
+                if self.selected_shapes:
+                    prompt_data["shape_elements"] = random.choice(self.selected_shapes)
+                
+                if self.selected_colors:
+                    prompt_data["color_approach"] = random.choice(self.selected_colors)
+                
+                if self.selected_patterns:
+                    prompt_data["pattern_type"] = random.choice(self.selected_patterns)
                 
                 # Get custom guidelines if they exist
                 custom_guidelines = prompt_data.get("custom_guidelines", None)
@@ -493,8 +660,9 @@ class DynamicBuilder:
         print("2. Geometric Transformations (shape morphing)")
         print("3. Pattern Generation (recursive/emergent)")
         print("4. Text Art (shape-based/organic)")
-        print("5. Custom Guidelines")
-        print("\nEnter choice (1-5) or press Enter to skip: ")
+        print("5. Optical Illusions & Visual Puzzles")
+        print("6. Custom Guidelines")
+        print("\nEnter choice (1-6) or press Enter to skip: ")
         mode_choice = input().strip()
         
         custom_guidelines = ""
@@ -514,7 +682,7 @@ class DynamicBuilder:
                     "4": "Simulate natural phenomena with particles affected by wind and gravity"
                 }
                 custom_guidelines = behaviors.get(behavior, behaviors["1"])
-                
+            
             elif mode_choice == "2":  # Geometric Transformations
                 print("\nGeometric Options:")
                 print("1. Sacred Geometry")
@@ -530,7 +698,7 @@ class DynamicBuilder:
                     "4": "Morph between different geometric shapes smoothly"
                 }
                 custom_guidelines = geometries.get(geometry, geometries["1"])
-                
+            
             elif mode_choice == "3":  # Pattern Generation
                 print("\nPattern Options:")
                 print("1. Reaction Diffusion")
@@ -546,7 +714,7 @@ class DynamicBuilder:
                     "4": "Create interference patterns using overlapping waves"
                 }
                 custom_guidelines = patterns.get(pattern, patterns["1"])
-                
+            
             elif mode_choice == "4":  # Text Art
                 print("\nWhat text would you like to create? (e.g. 'PRISM', 'Hello', etc.)")
                 desired_text = input().strip() or "PRISM"  # Default to PRISM if empty
@@ -565,52 +733,182 @@ class DynamicBuilder:
                 text_style = input().strip()
                 
                 text_styles = {
-                    "1": f"Form the text '{desired_text}' using dynamic particle systems that assemble and flow",
-                    "2": f"Fill the text '{desired_text}' with intricate patterns and motion",
-                    "3": f"Create the text '{desired_text}' that emerges from underlying patterns",
-                    "4": f"Transform flowing shapes that morph into the text '{desired_text}'"
+                    "1": f"Create text '{desired_text}' using dynamic particle systems that assemble and flow",
+                    "2": f"Create text '{desired_text}' filled with intricate patterns and motion",
+                    "3": f"Create text '{desired_text}' that emerges from underlying patterns",
+                    "4": f"Create text '{desired_text}' through transforming flowing shapes that morph"
                 }
-                custom_guidelines = text_styles.get(text_style, f"Create organic text spelling '{desired_text}' through shape-based patterns and dynamic motion")
+                custom_guidelines = text_styles.get(text_style, f"Create text '{desired_text}' through shape-based patterns and dynamic motion")
                 
                 # Append extra instructions if provided
                 if extra_instructions:
-                    custom_guidelines += f"\nAdditional Requirements: {extra_instructions}"
+                    custom_guidelines += f". Additional Requirements: {extra_instructions}"
             
-            elif mode_choice == "5":  # Custom Guidelines
+            elif mode_choice == "5":  # Optical Illusions
+                print("\nOptical Illusion Categories:")
+                print("1. Motion Illusions (spinning, drifting effects)")
+                print("2. Geometric Illusions (impossible shapes)")
+                print("3. Color Illusions (contrast, afterimages)")
+                print("4. Cognitive Illusions (ambiguous figures)")
+                print("\nFormat: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
+                
+                illusion_type = input("\nChoose illusion categories: ").strip()
+                
+                illusion_types = {
+                    "1": {
+                        "name": "Motion Illusions",
+                        "options": [
+                            "Spinning Spiral (hypnotic rotation effect)",
+                            "Peripheral Drift (subtle motion in periphery)",
+                            "Motion Aftereffect (waterfall illusion)",
+                            "Rotating Snakes (illusory rotation)",
+                        ]
+                    },
+                    "2": {
+                        "name": "Geometric Illusions",
+                        "options": [
+                            "Impossible Shapes (paradoxical structures)",
+                            "Cafe Wall (parallel lines appear sloped)",
+                            "Penrose Triangle (impossible triangle)",
+                            "Necker Cube (ambiguous perspective)",
+                        ]
+                    },
+                    "3": {
+                        "name": "Color Illusions",
+                        "options": [
+                            "Simultaneous Contrast (color perception changes)",
+                            "Color Afterimage (complementary color effect)",
+                            "Chromatic Aberration (color splitting)",
+                            "Bezold Effect (color spreading)",
+                        ]
+                    },
+                    "4": {
+                        "name": "Cognitive Illusions",
+                        "options": [
+                            "Ambiguous Figures (multiple interpretations)",
+                            "Hidden Patterns (emergent images)",
+                            "Gestalt Patterns (whole vs parts)",
+                            "Anamorphic Art (perspective-dependent)",
+                        ]
+                    }
+                }
+                
+                if illusion_type:
+                    indices = self._parse_range_selection(illusion_type, 4)
+                    if indices:
+                        # Convert 0-based indices to 1-based category numbers
+                        categories = [str(i + 1) for i in indices]
+                        
+                        # For each selected category, show its options and get specific choices
+                        selected_illusions = []
+                        for cat_num in categories:
+                            if cat_num in illusion_types:
+                                category = illusion_types[cat_num]
+                                print(f"\n{category['name']} Options:")
+                                for i, option in enumerate(category['options'], 1):
+                                    print(f"{i}. {option}")
+                                
+                                specific_choice = input(f"\nChoose specific {category['name'].lower()} (same format as above): ").strip()
+                                
+                                if specific_choice:
+                                    sub_indices = self._parse_range_selection(specific_choice, len(category['options']))
+                                    if sub_indices:
+                                        # Add all selected illusions from this category
+                                        for idx in sub_indices:
+                                            illusion = category['options'][idx].split(" (")[0]
+                                            self.selected_illusions.append((category['name'], illusion))
+                
+                        if self.selected_illusions:
+                            # Randomly select one illusion from all chosen ones for each piece
+                            cat_name, chosen_illusion = random.choice(self.selected_illusions)
+                            custom_guidelines = f"Create a dynamic optical illusion using the {chosen_illusion.lower()} technique. "
+                            custom_guidelines += "Focus on creating a strong visual effect that challenges perception. "
+                            custom_guidelines += "Ensure the illusion is clear and effective, with smooth transitions and proper timing for maximum impact."
+                        else:
+                            # If no specific illusions were chosen, use all selected categories
+                            cat_names = [illusion_types[c]['name'] for c in categories]
+                            custom_guidelines = f"Create a dynamic optical illusion combining elements from the following categories: {', '.join(cat_names)}. "
+                            custom_guidelines += "Choose the most effective techniques to create compelling visual effects. "
+                            custom_guidelines += "Focus on strong perceptual impact and smooth execution."
+                    else:
+                        custom_guidelines = "Create a dynamic optical illusion using any suitable technique. "
+                        custom_guidelines += "Choose the most effective approach to create a compelling visual effect. "
+                        custom_guidelines += "Focus on strong perceptual impact and smooth execution."
+                else:
+                    custom_guidelines = "Create a dynamic optical illusion using any suitable technique. "
+                    custom_guidelines += "Choose the most effective approach to create a compelling visual effect. "
+                    custom_guidelines += "Focus on strong perceptual impact and smooth execution."
+            
+            elif mode_choice == "6":  # Custom Guidelines
                 print("\nEnter your custom creative guidelines:")
                 custom_guidelines = input().strip()
         
-        # Store all settings in a dictionary
-        settings = {
-            'model_name': self.selected_model,
-            'custom_guidelines': custom_guidelines
-        }
+        # Step 1: Choose base techniques
+        print("\nChoose base mathematical techniques")
+        print("---------------------------")
+        print("You can select specific techniques for each category, or press Enter to skip.")
+        print("Format: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
+        print("\nIf you skip all categories, the AI will intelligently select techniques based on:")
+        print("• Your custom guidelines and creative direction")
+        print("• Historical performance data")
+        print("• Technique synergy patterns")
+        print("• The chosen creative mode (static vs. dynamic)\n")
         
-        # If they want to skip wizard with just guidelines
-        if custom_guidelines:
-            print("\nWould you like to:")
-            print("1. Use guidelines with wizard (recommended)")
-            print("2. Use only guidelines (skip wizard)")
-            choice = input("\nEnter choice (1-2) or press Enter for option 1: ").strip()
+        categories = {
+            'geometry': self.config.technique_categories['geometry'],
+            'motion': self.config.technique_categories['motion'],
+            'patterns': self.config.technique_categories['patterns']
+        }
             
-            if choice == "2":
-                settings['skip_wizard'] = True
-                return settings
+        for category, techniques in categories.items():
+            print(f"\n{category.title()} Techniques:")
+            for i, technique in enumerate(techniques, 1):
+                print(f"{i}. {technique}")
+            
+            choices = input(f"\nSelect {category} techniques: ").strip()
+            if choices:
+                indices = self._parse_range_selection(choices, len(techniques))
+                selected = [techniques[i] for i in indices]
+                self.selected_techniques.extend(selected)
+        
+        if self.selected_techniques:
+            print(f"\nSelected techniques: {', '.join(self.selected_techniques)}")
+        else:
+            print("\nNo specific techniques selected - AI will analyze your requirements and select optimal techniques")
+        
+        # Step 2: Choose motion style
+        motion_style = self._choose_motion_style()
+        
+        # Step 3: Choose shape elements
+        shape_elements = self._choose_shape_elements()
+            
+        # Step 4: Choose color approach
+        color_approach = self._choose_color_approach()
+        
+        # Step 5: Choose pattern type
+        pattern_type = self._choose_pattern_type()
         
         # Get all wizard settings
-        self._choose_base_techniques()
-        settings['techniques'] = self.selected_techniques
+        self._choose_motion_style()
+        self._choose_shape_elements()
+        self._choose_color_approach()
+        self._choose_pattern_type()
         
-        settings['motion_style'] = self._choose_motion_style()
-        settings['shape_elements'] = self._choose_shape_elements()
-        settings['color_approach'] = self._choose_color_approach()
-        settings['pattern_type'] = self._choose_pattern_type()
+        settings = {
+            "model": self.selected_model,
+            "techniques": self.selected_techniques,
+            "motion_styles": self.selected_motion_styles,
+            "shapes": self.selected_shapes,
+            "colors": self.selected_colors,
+            "patterns": self.selected_patterns,
+            "custom_guidelines": custom_guidelines
+        }
         
         return settings
         
     def create_with_settings(self, settings: dict) -> Optional[Pattern]:
         """Create artwork using stored settings"""
-        self.selected_model = settings['model_name']
+        self.selected_model = settings['model']
         self.selected_techniques = settings.get('techniques', [])
         
         if settings.get('skip_wizard'):

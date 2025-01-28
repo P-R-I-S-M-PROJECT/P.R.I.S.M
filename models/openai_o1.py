@@ -6,6 +6,48 @@ from config import Config
 import random
 
 class OpenAIO1Generator:
+    # Class constants for text art
+    TEXT_MASK_TEMPLATE = """PGraphics letterMask;
+letterMask = createGraphics(1080, 1080);
+letterMask.beginDraw();
+letterMask.background(0);
+letterMask.fill(255);
+letterMask.textAlign(CENTER, CENTER);
+letterMask.textSize(200);  // Adjust size as needed
+letterMask.text("{text}", letterMask.width/2, letterMask.height/2);
+letterMask.endDraw();"""
+
+    TEXT_REQUIREMENTS = """=== CRITICAL: Text Integration Requirements ===
+You MUST follow these requirements EXACTLY to create organic text that emerges from patterns:
+
+1. Create Text Mask:
+   REQUIRED - Copy this initialization code exactly:
+{mask_code}
+
+2. Pattern Integration:
+   • Create an ArrayList of pattern elements (circles, particles, etc.)
+   • Use letterMask.get(x, y) to check if a point is inside text
+   • Only place/grow patterns where letterMask.get(x, y) brightness > 0
+   • Let the text emerge naturally from pattern behavior
+
+3. Animation:
+   • Use the progress variable to animate pattern elements
+   • Maintain smooth transitions and looping
+   • Keep the text readable but organic"""
+
+    # Required patterns for text art validation
+    TEXT_VALIDATION_PATTERNS = [
+        r'PGraphics\s+letterMask\s*;',
+        r'letterMask\s*=\s*createGraphics\s*\(\s*1080\s*,\s*1080\s*\)',
+        r'letterMask\s*\.\s*beginDraw\s*\(\s*\)',
+        r'letterMask\s*\.\s*background\s*\(\s*0\.?0?\s*\)',
+        r'letterMask\s*\.\s*fill\s*\(\s*255\s*\)',
+        r'letterMask\s*\.\s*textAlign\s*\(\s*CENTER\s*,\s*CENTER\s*\)',
+        r'letterMask\s*\.\s*textSize\s*\(\s*\d+',
+        r'letterMask\s*\.\s*text\s*\(',
+        r'letterMask\s*\.\s*endDraw\s*\(\s*\)'
+    ]
+
     def __init__(self, config: Config, logger: ArtLogger = None):
         self.config = config
         self.log = logger or ArtLogger()
@@ -219,9 +261,9 @@ Return your code between these markers:
         """Clean and prepare user code, ensuring proper structure"""
         try:
             # Fix common letterMask issues first
-            code = re.sub(r'letterMask\s*\.\s*letterMask', 'letterMask', code)  # Fix double reference
-            code = re.sub(r'letterMask\s*\.\s*$', 'letterMask.', code)  # Fix dangling dot
-            code = re.sub(r'letterMask\s*\.\s*\n', 'letterMask.\n', code)  # Fix dot with newline
+            code = re.sub(r'letterMask\s*\.\s*letterMask', 'letterMask', code)
+            code = re.sub(r'letterMask\s*\.\s*$', 'letterMask.', code)
+            code = re.sub(r'letterMask\s*\.\s*\n', 'letterMask.\n', code)
             
             # Auto-fix missing letterMask.background(0) if needed
             if 'letterMask.beginDraw()' in code and not re.search(r'letterMask\s*\.\s*background\s*\(\s*0\.?0?\s*\)', code):
@@ -232,14 +274,10 @@ Return your code between these markers:
             
             # Fix specific letterMask initialization sequence
             if 'letterMask.beginDraw()' in code:
-                mask_init = """  letterMask = createGraphics(1080, 1080);
-  letterMask.beginDraw();
-  letterMask.background(0);
-  letterMask.fill(255);
-  letterMask.textAlign(CENTER, CENTER);
-  letterMask.textSize(200);
-  letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
-  letterMask.endDraw();"""
+                # Use the template with default text
+                mask_init = self.TEXT_MASK_TEMPLATE.format(text="PRISM")
+                # Indent properly
+                mask_init = "\n".join("  " + line for line in mask_init.split("\n"))
                 
                 # Replace any existing letterMask initialization with the correct sequence
                 code = re.sub(
@@ -343,21 +381,9 @@ Return your code between these markers:
         
         # For text-based art, verify proper mask usage with more flexible patterns
         if 'text(' in code:
-            required_mask_patterns = [
-                r'PGraphics\s+letterMask\s*;',
-                r'letterMask\s*=\s*createGraphics\s*\(\s*1080\s*,\s*1080\s*\)',
-                r'letterMask\s*\.\s*beginDraw\s*\(\s*\)',
-                r'letterMask\s*\.\s*background\s*\(\s*0\.?0?\s*\)',
-                r'letterMask\s*\.\s*fill\s*\(\s*255\s*\)',
-                r'letterMask\s*\.\s*textAlign\s*\(\s*CENTER\s*,\s*CENTER\s*\)',
-                r'letterMask\s*\.\s*textSize\s*\(\s*\d+',
-                r'letterMask\s*\.\s*text\s*\(',
-                r'letterMask\s*\.\s*endDraw\s*\(\s*\)'
-            ]
-            
             # Check for missing mask elements with regex patterns
             missing_elements = []
-            for pattern in required_mask_patterns:
+            for pattern in self.TEXT_VALIDATION_PATTERNS:
                 if not re.search(pattern, code, re.IGNORECASE | re.MULTILINE):
                     missing_elements.append(pattern)
             
@@ -366,7 +392,7 @@ Return your code between these markers:
                 cleaned = self._clean_code(code)
                 # Recheck after cleaning
                 still_missing = []
-                for pattern in required_mask_patterns:
+                for pattern in self.TEXT_VALIDATION_PATTERNS:
                     if not re.search(pattern, cleaned, re.IGNORECASE | re.MULTILINE):
                         still_missing.append(pattern)
                 
@@ -600,16 +626,18 @@ Return your code between these markers:
     def generate_code(self, prompt_data: dict, custom_guidelines: str = None) -> Optional[str]:
         """Generate code using the wizard prompt data"""
         try:
-            # Build creative prompt from wizard data
             creative_prompt = ""
 
-            # If there are custom guidelines, make them the primary focus
             if custom_guidelines:
                 creative_prompt = f"""{custom_guidelines}
 
 === IMPLEMENTATION REQUIREMENTS ==="""
+
+                # Check if this is text art
+                if prompt_data.get("is_text_art"):
+                    text = prompt_data.get("text", "PRISM")
+                    creative_prompt += "\n\n" + self._get_text_requirements(text)
             else:
-                # Only add the general creative freedom prompt if no specific guidelines
                 creative_prompt = """=== PROCESSING SKETCH GENERATOR ===
 Create a visually appealing animation that loops smoothly over 6 seconds.
 Let your creativity guide the direction - feel free to explore and experiment.
@@ -648,6 +676,11 @@ Keep the code modular and efficient."""
             self.log.error(f"Error in code generation: {str(e)}")
             return None
 
+    def _get_text_requirements(self, text: str = "PRISM") -> str:
+        """Get formatted text requirements with proper mask initialization"""
+        mask_code = self.TEXT_MASK_TEMPLATE.format(text=text)
+        return self.TEXT_REQUIREMENTS.format(mask_code=mask_code)
+
     def _build_creative_prompt(self, motion: str, shapes: str, colors: str, pattern: str, custom_guidelines: str = "") -> dict:
         """Build the creative prompt from selected options"""
         prompt = {
@@ -666,34 +699,7 @@ Keep the code modular and efficient."""
         
         # If text requirement, add specific mask-based guidance
         if is_text_requirement:
-            prompt["text_requirements"] = """
-=== CRITICAL: Text Integration Requirements ===
-You MUST follow these requirements EXACTLY to create organic text that emerges from patterns:
-
-1. Create Text Mask:
-   REQUIRED - Copy this initialization code exactly:
-   PGraphics letterMask;
-   letterMask = createGraphics(1080, 1080);
-   letterMask.beginDraw();
-   letterMask.background(0);
-   letterMask.fill(255);
-   letterMask.textAlign(CENTER, CENTER);
-   letterMask.textSize(200);  // Adjust size as needed
-   letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
-   letterMask.endDraw();
-
-2. Pattern Integration:
-   • Create an ArrayList of pattern elements (circles, particles, etc.)
-   • Use letterMask.get(x, y) to check if a point is inside text
-   • Only place/grow patterns where letterMask.get(x, y) brightness > 0
-   • Let the text emerge naturally from pattern behavior
-
-3. Animation:
-   • Use the progress variable to animate pattern elements
-   • Maintain smooth transitions and looping
-   • Keep the text readable but organic
-
-Custom Requirements: {custom_guidelines}"""
+            prompt["text_requirements"] = self.TEXT_REQUIREMENTS.format(mask_code=self.TEXT_MASK_TEMPLATE.format(text=custom_guidelines))
             
         return prompt 
 
@@ -707,14 +713,7 @@ You MUST fix it by ensuring the code EXACTLY includes this line after letterMask
     letterMask.background(0);
 
 The complete required sequence is:
-    letterMask = createGraphics(1080, 1080);
-    letterMask.beginDraw();
-    letterMask.background(0);  // <-- THIS LINE IS REQUIRED
-    letterMask.fill(255);
-    letterMask.textAlign(CENTER, CENTER);
-    letterMask.textSize(200);
-    letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
-    letterMask.endDraw();
+{self.TEXT_MASK_TEMPLATE.format(text="PRISM")}
 
 Here is the previous code:
 {code}
@@ -728,14 +727,7 @@ Return ONLY the creative code between the markers:
 The previous code had the following error: {error_msg}
 
 You MUST use the PGraphics mask approach for text. Copy this EXACT sequence:
-    letterMask = createGraphics(1080, 1080);
-    letterMask.beginDraw();
-    letterMask.background(0);
-    letterMask.fill(255);
-    letterMask.textAlign(CENTER, CENTER);
-    letterMask.textSize(200);
-    letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
-    letterMask.endDraw();
+{self.TEXT_MASK_TEMPLATE.format(text="PRISM")}
 
 Here is the previous code:
 {code}
