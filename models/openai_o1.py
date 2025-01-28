@@ -74,56 +74,21 @@ You MUST follow these requirements EXACTLY to create organic text that emerges f
         self.current_model = 'o1-mini'
         return self.model_ids['o1-mini']
     
-    def generate_with_ai(self, prompt: str, skip_generation_prompt: bool = False, is_variation: bool = False, retry_count: int = 0) -> Optional[str]:
-        """Generate code using OpenAI API with better error handling and retries"""
+    def generate_with_ai(self, prompt: str, skip_generation_prompt: bool = False, is_variation: bool = False, retry_count: int = 0, max_retries: int = 3, last_code: str = None, last_error: str = None) -> Optional[str]:
+        """Generate code using OpenAI API with improved error handling and retries"""
         try:
-            if skip_generation_prompt:
+            # Build the prompt based on context
+            if retry_count > 0 and last_code and last_error:
+                full_prompt = self._build_error_prompt(last_code, last_error)
+            elif skip_generation_prompt:
                 full_prompt = prompt
             else:
-                # Check if this is a guided prompt (contains custom guidelines or specific requirements)
+                # Check if this is a guided prompt
                 is_guided = "=== IMPLEMENTATION REQUIREMENTS ===" in prompt or "Custom Requirements:" in prompt
-                
-                if is_guided:
-                    # For guided mode, focus on user requirements
-                    full_prompt = f"""=== PROCESSING SKETCH REQUIREMENTS ===
-{prompt}
-
-=== REQUIRED FUNCTIONS ===
-You MUST define these two functions:
-1. void initSketch() - Called once at start
-2. void runSketch(float progress) - Called each frame with progress (0.0 to 1.0)
-
-=== SYSTEM FRAMEWORK ===
-The system automatically handles these - DO NOT include them:
-• void setup() or draw() functions
-• size(1080, 1080) and frameRate settings
-• background(0) or any background clearing
-• translate(width/2, height/2) for centering
-• Frame saving and program exit
-
-=== CODE STRUCTURE ===
-1. Define any classes at the top
-2. Declare global variables
-3. Define initSketch() for setup
-4. Define runSketch(progress) for animation
-• The canvas is already centered at (0,0)
-• Initialize all variables with values
-• Use RGB values for colors (e.g., stroke(255, 0, 0) for red)
-
-=== RETURN FORMAT ===
-Return your code between these markers:
-// YOUR CREATIVE CODE GOES HERE
-// END OF YOUR CREATIVE CODE"""
-                else:
-                    # For non-guided mode, use the standard creative freedom prompt
-                    full_prompt = self._build_generation_prompt(prompt)
+                full_prompt = self._build_generation_prompt(prompt) if not is_guided else prompt
             
-            # If this is a retry, build error-specific prompt
-            if retry_count > 0:
-                full_prompt = self._build_error_prompt(prompt, self.last_error) if hasattr(self, 'last_error') else prompt
-            
-            # Log the full prompt being sent
-            self.log.debug(f"\n=== SENDING TO AI ===\n{full_prompt}\n==================\n")
+            # Log the attempt
+            self.log.debug(f"\n=== SENDING TO AI (Attempt {retry_count + 1}/{max_retries}) ===\n{full_prompt}\n==================\n")
             
             # Use the model that was selected
             selected_model = self._select_o1_model(self.current_model)
@@ -137,8 +102,7 @@ Return your code between these markers:
             )
             
             if not response.choices:
-                self.log.error("No response generated from AI")
-                return None
+                raise ValueError("No response generated from AI")
             
             # Process response and validate
             raw_content = response.choices[0].message.content
@@ -146,24 +110,46 @@ Return your code between these markers:
             
             code = self._extract_code_from_response(raw_content, is_variation)
             if not code:
-                self.log.debug("Failed to extract code from response")
-                return raw_content.strip()
+                raise ValueError("Failed to extract code from response")
             
-            # Validate and store any error for retry context
+            # Validate the generated code
             is_valid, error_msg = self.validate_creative_code(code, is_snippet=is_variation)
             if not is_valid:
-                self.last_error = error_msg
                 self.log.debug(f"\n=== VALIDATION ERROR ===\nCreative validation failed: {error_msg}\n==================\n")
-                raise ValueError(f"Creative validation: {error_msg}")
-            
-            # Clear last error if successful
-            if hasattr(self, 'last_error'):
-                delattr(self, 'last_error')
+                
+                # Attempt retry if we haven't exceeded max retries
+                if retry_count < max_retries:
+                    self.log.debug(f"Attempting retry {retry_count + 1}/{max_retries}")
+                    return self.generate_with_ai(
+                        prompt=prompt,
+                        skip_generation_prompt=skip_generation_prompt,
+                        is_variation=is_variation,
+                        retry_count=retry_count + 1,
+                        max_retries=max_retries,
+                        last_code=code,  # Pass the failed code
+                        last_error=error_msg  # Pass the error message
+                    )
+                else:
+                    raise ValueError(f"Max retries ({max_retries}) exceeded. Last error: {error_msg}")
             
             return code
             
         except Exception as e:
             self.log.error(f"AI generation error: {str(e)}")
+            
+            # Attempt retry if we haven't exceeded max retries
+            if retry_count < max_retries:
+                self.log.debug(f"Attempting retry {retry_count + 1}/{max_retries} after error: {str(e)}")
+                return self.generate_with_ai(
+                    prompt=prompt,
+                    skip_generation_prompt=skip_generation_prompt,
+                    is_variation=is_variation,
+                    retry_count=retry_count + 1,
+                    max_retries=max_retries,
+                    last_code=last_code,  # Preserve any previous code
+                    last_error=str(e)  # Use the exception message as error
+                )
+            
             return None
 
     def _build_generation_prompt(self, techniques: str) -> str:
@@ -192,7 +178,7 @@ Pattern & Texture:
 • {', '.join(pattern_techniques)}"""
         
         return f"""=== PROCESSING SKETCH GENERATOR ===
-Create a visually appealing animation that loops smoothly over 6 seconds.
+Create a visually appealing processing animation that loops smoothly over 6 seconds.
 Let your creativity guide the direction - feel free to explore and experiment.
 It's better to do a few things well than try to include everything.
 
@@ -258,49 +244,39 @@ Return your code between these markers:
         return random.sample(techniques, count)
 
     def _clean_code(self, code: str, is_variation: bool = False) -> str:
-        """Clean and prepare user code, ensuring proper structure"""
+        """Clean and prepare user code, with minimal interference to valid Processing code"""
         try:
-            # Fix common letterMask issues first
-            code = re.sub(r'letterMask\s*\.\s*letterMask', 'letterMask', code)
-            code = re.sub(r'letterMask\s*\.\s*$', 'letterMask.', code)
-            code = re.sub(r'letterMask\s*\.\s*\n', 'letterMask.\n', code)
+            # Only clean up basic formatting issues
+            lines = code.split('\n')
+            cleaned_lines = []
             
-            # Auto-fix missing letterMask.background(0) if needed
-            if 'letterMask.beginDraw()' in code and not re.search(r'letterMask\s*\.\s*background\s*\(\s*0\.?0?\s*\)', code):
-                code = code.replace(
-                    'letterMask.beginDraw();',
-                    'letterMask.beginDraw();\n  letterMask.background(0);'
-                )
-            
-            # Fix specific letterMask initialization sequence
-            if 'letterMask.beginDraw()' in code:
-                # Use the template with default text
-                mask_init = self.TEXT_MASK_TEMPLATE.format(text="PRISM")
-                # Indent properly
-                mask_init = "\n".join("  " + line for line in mask_init.split("\n"))
+            for line in lines:
+                # Preserve indentation
+                leading_space = len(line) - len(line.lstrip())
+                line = line.strip()
                 
-                # Replace any existing letterMask initialization with the correct sequence
-                code = re.sub(
-                    r'letterMask\s*=\s*createGraphics\s*\([^)]*\)[^;]*;.*?letterMask\.endDraw\s*\(\s*\)\s*;',
-                    mask_init,
-                    code,
-                    flags=re.DOTALL
-                )
+                # Skip empty lines and comments
+                if not line or line.startswith("//"):
+                    cleaned_lines.append(" " * leading_space + line)
+                    continue
+                
+                # Only remove explicitly forbidden system calls
+                if any(call in line for call in [
+                    "size(", 
+                    "frameRate(", 
+                    "saveFrame(", 
+                    "exit()",
+                    "translate(width/2",
+                    "translate(height/2"
+                ]):
+                    continue
+                
+                # Keep the line with original indentation
+                cleaned_lines.append(" " * leading_space + line)
             
-            # Remove any setup() or draw() functions
-            code = re.sub(r'void\s+setup\s*\(\s*\)\s*{[^}]*}', '', code)
-            code = re.sub(r'void\s+draw\s*\(\s*\)\s*{[^}]*}', '', code)
+            code = "\n".join(cleaned_lines)
             
-            # Remove system calls but preserve letterMask calls
-            code = re.sub(r'(?<!letterMask\.)\bbackground\s*\([^)]*\);', '', code)  # Only remove non-letterMask background calls
-            code = re.sub(r'\bsize\s*\([^)]*\);', '', code)
-            code = re.sub(r'\bframeRate\s*\([^)]*\);', '', code)
-            code = re.sub(r'\btranslate\s*\(\s*width\s*/\s*2[^)]*\);', '', code)
-            code = re.sub(r'\btranslate\s*\(\s*height\s*/\s*2[^)]*\);', '', code)
-            code = re.sub(r'\bsaveFrame\s*\([^)]*\);', '', code)
-            code = re.sub(r'\bexit\s*\(\s*\);', '', code)
-            
-            # Clean up empty lines and whitespace
+            # Clean up multiple blank lines
             code = re.sub(r'\n\s*\n\s*\n', '\n\n', code)
             code = code.strip()
             
@@ -309,6 +285,42 @@ Return your code between these markers:
         except Exception as e:
             self.log.error(f"Error cleaning code: {e}")
             return code
+
+    def _convert_arrays_to_arraylists(self, code: str) -> str:
+        """Convert Java array syntax to ArrayList syntax"""
+        # Find array declarations and initializations
+        array_pattern = r'(\w+)\[\]\s+(\w+)\s*=\s*new\s+\1\[([^\]]+)\]'
+        code = re.sub(array_pattern, r'ArrayList<\1> \2 = new ArrayList<\1>()', code)
+        
+        # Replace array access with ArrayList methods
+        code = re.sub(r'(\w+)\[(\d+)\]', r'\1.get(\2)', code)
+        code = re.sub(r'(\w+)\[(\w+)\]', r'\1.get(\2)', code)
+        
+        # Replace array assignments with ArrayList methods
+        code = re.sub(r'(\w+)\[(\d+)\]\s*=\s*([^;]+)', r'\1.set(\2, \3)', code)
+        code = re.sub(r'(\w+)\[(\w+)\]\s*=\s*([^;]+)', r'\1.set(\2, \3)', code)
+        
+        # Fix array length references
+        code = re.sub(r'(\w+)\.length', r'\1.size()', code)
+        
+        return code
+
+    def _fix_sort_implementation(self, sort_code: str) -> str:
+        """Convert Java 8 style sort to Processing-compatible sort"""
+        # Extract the list being sorted
+        list_name = sort_code.split('.sort')[0].strip()
+        
+        # Create a Processing-compatible bubble sort implementation
+        return f"""// Custom sort implementation
+for (int i = 0; i < {list_name}.size() - 1; i++) {{
+  for (int j = 0; j < {list_name}.size() - i - 1; j++) {{
+    if ({list_name}.get(j).y > {list_name}.get(j + 1).y) {{
+      PVector temp = {list_name}.get(j);
+      {list_name}.set(j, {list_name}.get(j + 1));
+      {list_name}.set(j + 1, temp);
+    }}
+  }}
+}}"""
 
     def _extract_code_from_response(self, content: str, is_variation: bool = False) -> Optional[str]:
         """Extract and clean user code from AI response without template wrapping"""
@@ -351,61 +363,30 @@ Return your code between these markers:
             return code
 
     def validate_creative_code(self, code: str, is_snippet: bool = False) -> tuple[bool, str]:
-        """Validate creative code for forbidden elements"""
+        """Validate creative code with minimal interference, focusing only on critical issues"""
         if not code.strip():
             return False, "Empty code"
         
-        # Check for critical system-level functions that would break the sketch
+        # Check only for critical system-level functions that would break the sketch
         critical_forbidden = {
-            r'(?<!\.)\bsize\s*\(': 'Contains size() call',
-            r'(?<!letterMask\.)\bbackground\s*\(': 'Contains background() call',  # Allow letterMask.background()
-            r'(?<!\.)\bframeRate\s*\(': 'Contains frameRate() call',
-            r'(?<!\.)\bdraw\s*\(\s*\)': 'Contains draw() function',
+            r'\bsize\s*\(': 'Contains size() call - this is handled by the system',
+            r'\bframeRate\s*\(': 'Contains frameRate() call - this is handled by the system',
+            r'\bsaveFrame\s*\(': 'Contains saveFrame() call - this is handled by the system',
+            r'\bexit\s*\(': 'Contains exit() call - this is handled by the system',
+            r'\btranslate\s*\(\s*width\s*/\s*2': 'Contains origin re-centering - coordinates are already centered',
+            r'\btranslate\s*\(\s*height\s*/\s*2': 'Contains origin re-centering - coordinates are already centered'
         }
         
-        # Check for critical forbidden elements
+        # Only check for truly forbidden elements
         for pattern, error in critical_forbidden.items():
             if re.search(pattern, code):
                 return False, error
         
-        # Check for absolute translations that would re-center the origin
-        translation_patterns = [
-            r'translate\s*\(\s*width\s*/\s*2',
-            r'translate\s*\(\s*height\s*/\s*2',
-        ]
+        # For text-based art, verify only critical mask requirements
+        if 'text(' in code and not 'letterMask' in code:
+            return False, "Text art requires letterMask for proper rendering"
         
-        for line in code.split('\n'):
-            line = line.strip()
-            if any(re.search(pattern, line) for pattern in translation_patterns):
-                return False, "Contains origin re-centering - coordinates are already centered"
-        
-        # For text-based art, verify proper mask usage with more flexible patterns
-        if 'text(' in code:
-            # Check for missing mask elements with regex patterns
-            missing_elements = []
-            for pattern in self.TEXT_VALIDATION_PATTERNS:
-                if not re.search(pattern, code, re.IGNORECASE | re.MULTILINE):
-                    missing_elements.append(pattern)
-            
-            if missing_elements:
-                # Auto-fix common issues in _clean_code before failing
-                cleaned = self._clean_code(code)
-                # Recheck after cleaning
-                still_missing = []
-                for pattern in self.TEXT_VALIDATION_PATTERNS:
-                    if not re.search(pattern, cleaned, re.IGNORECASE | re.MULTILINE):
-                        still_missing.append(pattern)
-                
-                if still_missing:
-                    return False, f"Missing required mask elements: {', '.join(still_missing)}"
-            
-            # Check if text() is used directly on the canvas (not through mask)
-            lines = code.split('\n')
-            for line in lines:
-                if 'text(' in line and not 'letterMask.text(' in line:
-                    return False, "Text must only be drawn in the letterMask"
-        
-        # For non-snippets, ensure required functions exist with proper signatures
+        # For non-snippets, ensure only the absolutely required functions exist
         if not is_snippet:
             if not re.search(r'\bvoid\s+initSketch\s*\(\s*\)', code):
                 return False, "Missing initSketch() function"
@@ -587,7 +568,7 @@ Keep the code modular and efficient."""
 
         # Add O1-specific framework
         full_prompt = f"""=== PROCESSING SKETCH GENERATOR ===
-Create a visually appealing animation that loops smoothly over 6 seconds.
+Create a visually appealing processing based animation that loops smoothly over 6 seconds.
 Let your creativity guide the direction - feel free to experiment and innovate.
 
 === REQUIRED FUNCTIONS ===
@@ -623,63 +604,96 @@ Return your code between these markers:
         # Use the standard generation pipeline with the wizard prompt
         return self.generate_with_ai(full_prompt, skip_generation_prompt=True)
 
-    def generate_code(self, prompt_data: dict, custom_guidelines: str = None) -> Optional[str]:
+    def generate_code(self, prompt_data: dict, custom_guidelines: str = None, retry_count: int = 0) -> Optional[str]:
         """Generate code using the wizard prompt data"""
         try:
-            creative_prompt = ""
+            # Build base prompt with Processing requirements
+            base_prompt = (
+                "=== PROCESSING SKETCH GENERATOR ===\n"
+                "Create a visually appealing processing animation that loops smoothly over 6 seconds.\n"
+                "Let your creativity guide the direction - feel free to explore and experiment.\n\n"
+                "=== REQUIRED FUNCTIONS ===\n"
+                "You MUST define these two functions:\n"
+                "1. void initSketch() - Called once at start\n"
+                "2. void runSketch(float progress) - Called each frame with progress (0.0 to 1.0)\n\n"
+                "=== SYSTEM FRAMEWORK ===\n"
+                "The system automatically handles these - DO NOT include them:\n"
+                "• void setup() or draw() functions\n"
+                "• size(1080, 1080) and frameRate settings\n"
+                "• background(0) or any background clearing\n"
+                "• translate(width/2, height/2) for centering\n"
+                "• Frame saving and program exit\n\n"
+                "=== CODE STRUCTURE ===\n"
+                "1. Define any classes at the top\n"
+                "2. Declare global variables\n"
+                "3. Define initSketch() for setup\n"
+                "4. Define runSketch(progress) for animation\n"
+                "• The canvas is already centered at (0,0)\n"
+                "• Initialize all variables with values\n"
+                "• Use RGB values for colors (e.g., stroke(255, 0, 0) for red)\n"
+            )
 
+            # Add creative direction from prompt data
+            creative_direction = []
+            if prompt_data['techniques']:
+                creative_direction.append(f"Required Techniques: {', '.join(prompt_data['techniques'])}")
+            if prompt_data['motion_style']:
+                creative_direction.append(f"Motion Style: {prompt_data['motion_style']}")
+            if prompt_data['shape_elements']:
+                creative_direction.append(f"Shape Elements: {prompt_data['shape_elements']}")
+            if prompt_data['color_approach']:
+                creative_direction.append(f"Color Approach: {prompt_data['color_approach']}")
+            if prompt_data['pattern_type']:
+                creative_direction.append(f"Pattern Type: {prompt_data['pattern_type']}")
+
+            if creative_direction:
+                base_prompt += "\n\n=== CREATIVE DIRECTION ===\n• " + "\n• ".join(creative_direction)
+
+            # Add custom guidelines if provided
             if custom_guidelines:
-                creative_prompt = f"""{custom_guidelines}
-
-=== IMPLEMENTATION REQUIREMENTS ==="""
+                base_prompt += f"\n\n=== CUSTOM REQUIREMENTS ===\n{custom_guidelines}"
 
                 # Check if this is text art
                 if prompt_data.get("is_text_art"):
                     text = prompt_data.get("text", "PRISM")
-                    creative_prompt += "\n\n" + self._get_text_requirements(text)
-            else:
-                creative_prompt = """=== PROCESSING SKETCH GENERATOR ===
-Create a visually appealing animation that loops smoothly over 6 seconds.
-Let your creativity guide the direction - feel free to explore and experiment.
-It's better to do a few things well than try to include everything."""
-            
-            # Add selected techniques if any
-            if prompt_data['techniques']:
-                creative_prompt += f"\n\nRequired Techniques: {', '.join(prompt_data['techniques'])}"
-            
-            # Add other characteristics as supporting guidelines
-            supporting_elements = []
-            if prompt_data['motion_style']:
-                supporting_elements.append(f"Motion Style: {prompt_data['motion_style']}")
-            if prompt_data['shape_elements']:
-                supporting_elements.append(f"Shape Elements: {prompt_data['shape_elements']}")
-            if prompt_data['color_approach']:
-                supporting_elements.append(f"Color Approach: {prompt_data['color_approach']}")
-            if prompt_data['pattern_type']:
-                supporting_elements.append(f"Pattern Type: {prompt_data['pattern_type']}")
-            
-            if supporting_elements:
-                creative_prompt += "\n\nSupporting Characteristics:\n• " + "\n• ".join(supporting_elements)
-            
-            creative_prompt += """
+                    base_prompt += "\n\n" + self._get_text_requirements(text)
 
-Focus on smooth animation and visual harmony.
-Use the progress variable (0.0 to 1.0) for animation timing.
-Keep the code modular and efficient."""
+            # Add animation guidelines
+            base_prompt += (
+                "\n\n=== ANIMATION GUIDELINES ===\n"
+                "• Use the progress variable (0.0 to 1.0) for ALL animations\n"
+                "• Ensure smooth looping by matching start/end states\n"
+                "• Use map() to convert progress to specific ranges\n"
+                "• Use lerp() or lerpColor() for smooth transitions\n"
+                "• Avoid sudden jumps or discontinuities\n"
+                "• Consider easing functions for natural motion\n"
+                "• Test values at progress = 0.0, 0.5, and 1.0\n\n"
+                "=== RETURN FORMAT ===\n"
+                "Return your code between these markers:\n"
+                "// YOUR CREATIVE CODE GOES HERE\n"
+                "// END OF YOUR CREATIVE CODE"
+            )
 
-            # Generate code using the creative prompt
-            code = self.generate_with_ai(creative_prompt)
-            
+            # Generate code using the enhanced prompt
+            code = self.generate_with_ai(base_prompt, skip_generation_prompt=True, retry_count=retry_count)
             return code
-            
+
         except Exception as e:
             self.log.error(f"Error in code generation: {str(e)}")
             return None
 
-    def _get_text_requirements(self, text: str = "PRISM") -> str:
-        """Get formatted text requirements with proper mask initialization"""
-        mask_code = self.TEXT_MASK_TEMPLATE.format(text=text)
-        return self.TEXT_REQUIREMENTS.format(mask_code=mask_code)
+    def _get_text_requirements(self, text: str) -> str:
+        """Get text-specific requirements for text art generation"""
+        return (
+            "=== TEXT ART REQUIREMENTS ===\n"
+            f"• Create art using the text: {text}\n"
+            "• Text should be clearly visible and readable\n"
+            "• Animate the text in an engaging way\n"
+            "• Consider using multiple instances or layers\n"
+            "• Experiment with scale, rotation, and opacity\n"
+            "• Add complementary visual elements\n"
+            "• Ensure smooth transitions between states"
+        )
 
     def _build_creative_prompt(self, motion: str, shapes: str, colors: str, pattern: str, custom_guidelines: str = "") -> dict:
         """Build the creative prompt from selected options"""
@@ -704,53 +718,42 @@ Keep the code modular and efficient."""
         return prompt 
 
     def _build_error_prompt(self, code: str, error_msg: str = None) -> str:
-        """Build error prompt for retry attempts with explicit requirements"""
-        if 'letterMask.background(0)' in error_msg:
-            return f"""
-The previous code had the following error: {error_msg}
+        """Build error prompt focusing on actual Processing compilation errors"""
+        base_context = (
+            "The previous code generated an error. Please fix the issues while maintaining the core functionality.\n\n"
+            "=== PREVIOUS ERROR ===\n"
+            f"{error_msg}\n\n"
+            "=== PROCESSING REQUIREMENTS ===\n"
+            "• Must define initSketch() and runSketch(progress)\n"
+            "• The system handles setup(), draw(), size(), and frameRate\n"
+            "• The canvas is already centered at (0,0)\n"
+            "• All animations must use the progress variable (0.0 to 1.0)\n"
+        )
 
-You MUST fix it by ensuring the code EXACTLY includes this line after letterMask.beginDraw():
-    letterMask.background(0);
+        # Add specific guidance only for actual Processing errors
+        specific_guidance = ""
+        
+        if error_msg:
+            if "text" in error_msg.lower():
+                specific_guidance += (
+                    "\n=== TEXT REQUIREMENTS ===\n"
+                    "• Use letterMask for text rendering\n"
+                    "• Initialize letterMask properly\n"
+                    f"{self.TEXT_MASK_TEMPLATE.format(text='PRISM')}\n"
+                )
+            elif "missing" in error_msg.lower() and ";" in error_msg:
+                specific_guidance += (
+                    "\n=== SYNTAX GUIDE ===\n"
+                    "• Check for missing semicolons at the end of statements\n"
+                    "• Ensure proper function and class declarations\n"
+                    "• Verify bracket matching and closure\n"
+                )
 
-The complete required sequence is:
-{self.TEXT_MASK_TEMPLATE.format(text="PRISM")}
+        return f"""{base_context}{specific_guidance}
 
-Here is the previous code:
+=== PREVIOUS CODE ===
 {code}
 
-Return ONLY the creative code between the markers:
+Please fix the issues and return ONLY the corrected code between these markers:
 // YOUR CREATIVE CODE GOES HERE
-// END OF YOUR CREATIVE CODE
-"""
-        elif 'text(' in error_msg:
-            return f"""
-The previous code had the following error: {error_msg}
-
-You MUST use the PGraphics mask approach for text. Copy this EXACT sequence:
-{self.TEXT_MASK_TEMPLATE.format(text="PRISM")}
-
-Here is the previous code:
-{code}
-
-Return ONLY the creative code between the markers:
-// YOUR CREATIVE CODE GOES HERE
-// END OF YOUR CREATIVE CODE
-"""
-        else:
-            return f"""
-The previous code had the following error: {error_msg}
-
-Please fix the error and ensure:
-1. All code is between the markers
-2. No setup() or draw() functions
-3. No direct background() calls
-4. No translate(width/2, height/2)
-5. Proper Processing syntax
-
-Here is the previous code:
-{code}
-
-Return ONLY the creative code between the markers:
-// YOUR CREATIVE CODE GOES HERE
-// END OF YOUR CREATIVE CODE
-""" 
+// END OF YOUR CREATIVE CODE""" 
