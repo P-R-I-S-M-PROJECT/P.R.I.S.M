@@ -1,70 +1,80 @@
 // === USER'S CREATIVE CODE ===
-class Spiro {
-  float R, r, p;
+// ------------------------------------------------------------
+// 1. (Optional) Classes
+//    (No classes needed in this example; everything is handled
+//     procedurally and via global variables/functions)
+// ------------------------------------------------------------
 
-  // Removed direct color assignment in favor of dynamic/animated colors
-  Spiro(float bigR, float smallR, float penOffset) {
-    R = bigR;
-    r = smallR;
-    p = penOffset;
-  }
+// ------------------------------------------------------------
+// 2.Global Variables
+// ------------------------------------------------------------
+int circleCount;
+int recursionDepth;
+float baseRadius;
 
-  void drawSpiro(float offset, int detail) {
-    // Use HSB for more "trippy" color transitions
-    colorMode(HSB, 360, 100, 100, 100);
-    noStroke();
-    rectMode(CENTER);
+// ------------------------------------------------------------
+// 3.initSketch() - Called once at the start
+// ------------------------------------------------------------
+void initSketch() {
+  // Configure global variables
+  circleCount    = 6;     // Number of circles in each ring
+  recursionDepth = 3;     // How deep the recursive pattern goes
+  baseRadius     = 120;   // Base radius for the main circle
+}
 
-    for (int i = 0; i < detail; i++) {
-      float t = map(i, 0, detail, 0, TWO_PI * 4);
-      float x = (R - r) * cos(t + offset) + p * cos(((R - r) / r) * (t + offset));
-      float y = (R - r) * sin(t + offset) - p * sin(((R - r) / r) * (t + offset));
+// ------------------------------------------------------------
+// Utility: Returns a rainbow color using an angle-based approach
+// ------------------------------------------------------------
+color getRainbowColor(float angle) {
+  // Create smoothly transitioning rainbow hues with sine waves
+  float r = 127 + 127 * sin(angle + 0.0);
+  float g = 127 + 127 * sin(angle + TWO_PI/3);
+  float b = 127 + 127 * sin(angle + 2*TWO_PI/3);
+  return color(r, g, b);
+}
 
-      pushMatrix();
-      translate(x, y);
-      rotate(t + offset);
-
-      // Dynamic hue based on angle
-      float hueVal = (degrees(t + offset) * 2) % 360;
-      // Vary square size for extra movement
-      float sqSize = 6 + 6 * sin((t + offset) * 3);
-
-      // Primary square
-      fill(hueVal, 100, 100, 80);
-      rect(0, 0, sqSize, sqSize);
-
-      // Secondary "square influence" rotated for a trippier effect
-      rotate(PI / 4);
-      fill((hueVal + 180) % 360, 100, 100, 60);
-      rect(0, 0, sqSize * 0.7, sqSize * 0.7);
-
-      popMatrix();
+// ------------------------------------------------------------
+// Recursive drawing of circles
+// ------------------------------------------------------------
+void drawRecursiveCircle(float x, float y, float r, int depth, float time, int index) {
+  // Harmonic scale factor to make circles pulsate
+  float scaleFactor = 0.8 + 0.2 * sin(time + index);
+  float circleSize = 2.0 * r * scaleFactor; // diameter
+  
+  // Choose color based on time + index
+  color c = getRainbowColor(time + index);
+  
+  noStroke();
+  fill(c);
+  ellipse(x, y, circleSize, circleSize);
+  
+  // If we still have recursion depth left, draw a ring of smaller circles
+  if (depth > 0) {
+    for (int i = 0; i < circleCount; i++) {
+      float angleStep = TWO_PI / circleCount;
+      float ringAngle = angleStep * i + time * 0.5;  // slight rotation over time
+      
+      // Additional harmonic motion in ring distance
+      float ringDist = r * (1.5 + 0.2 * sin(time + i + index));
+      
+      float nx = x + ringDist * cos(ringAngle);
+      float ny = y + ringDist * sin(ringAngle);
+      
+      // Recurse with half the radius, decreased depth, offset index
+      drawRecursiveCircle(nx, ny, r * 0.5, depth - 1, time, index + i + 1);
     }
   }
 }
 
-// Global variables
-Spiro[] spiros;
-
-void initSketch() {
-  // More varied parameters for extra complexity
-  spiros = new Spiro[4];
-  spiros[0] = new Spiro(200, 60, 20);
-  spiros[1] = new Spiro(250, 30, 80);
-  spiros[2] = new Spiro(180, 80, 40);
-  // An additional spiro for a fuller composition
-  spiros[3] = new Spiro(220, 40, 60);
-}
-
+// ------------------------------------------------------------
+// 4.runSketch(progress) - Called each frame with progress 0..1
+// ------------------------------------------------------------
 void runSketch(float progress) {
-  // progress goes from 0.0 to 1.0 in a loop, mapping to one full rotation
-  float angle = progress * TWO_PI;
-
-  // Draw each spirograph with a slight offset variation
-  for (int i = 0; i < spiros.length; i++) {
-    float offset = angle * (1 + 0.3 * i);
-    spiros[i].drawSpiro(offset, 600);
-  }
+  // progress goes from 0.0 to 1.0 over 6 seconds, then loops
+  float t = progress * TWO_PI;  // Make one complete cycle from 0..2
+  
+  // Draw one fractal circle pattern at the center
+  drawRecursiveCircle(0, 0, baseRadius, recursionDepth, t, 0);
 }
 // END OF YOUR CREATIVE CODE
 

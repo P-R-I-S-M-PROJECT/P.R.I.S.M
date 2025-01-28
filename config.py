@@ -142,6 +142,54 @@ class Config:
             }
         }
         
+        # Add dynamic art configuration
+        self.dynamic_art_config = {
+            'motion_elements': [
+                'rotation', 'oscillation', 'wave', 'spiral',
+                'bounce', 'flow', 'pulse', 'orbit'
+            ],
+            'shape_elements': [
+                'circles', 'squares', 'triangles', 'lines',
+                'curves', 'polygons', 'particles', 'meshes'
+            ],
+            'color_schemes': [
+                'monochrome', 'complementary', 'analogous', 'triadic',
+                'rainbow', 'grayscale', 'warm', 'cool'
+            ],
+            'pattern_types': [
+                'geometric', 'organic', 'recursive', 'fractal',
+                'symmetrical', 'random', 'grid-based', 'flowing'
+            ],
+            'interaction_modes': [
+                'autonomous', 'reactive', 'progressive', 'cyclical',
+                'generative', 'evolutionary', 'harmonic', 'chaotic'
+            ],
+            'complexity_levels': {
+                'minimal': {
+                    'max_elements': 3,
+                    'max_techniques': 2,
+                    'description': 'Simple, focused compositions'
+                },
+                'balanced': {
+                    'max_elements': 5,
+                    'max_techniques': 3,
+                    'description': 'Moderate complexity with clear focus'
+                },
+                'complex': {
+                    'max_elements': 8,
+                    'max_techniques': 4,
+                    'description': 'Rich, intricate compositions'
+                }
+            },
+            'animation_speeds': {
+                'very_slow': 0.25,
+                'slow': 0.5,
+                'medium': 1.0,
+                'fast': 2.0,
+                'very_fast': 4.0
+            }
+        }
+        
         # Integration settings
         self.static_integration = {
             'use_existing_db': True,  # Use main PRISM database

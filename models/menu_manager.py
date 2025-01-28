@@ -1,6 +1,7 @@
 from logger import ArtLogger
 from config import Config
 from models.flux import FluxGenerator
+from models.dynamic_builder import DynamicBuilder
 
 class MenuManager:
     def __init__(self, config: Config, log: ArtLogger, prism_instance):
@@ -8,6 +9,7 @@ class MenuManager:
         self.log = log
         self.prism = prism_instance
         self.selected_model = None
+        self.dynamic_builder = None
         
     def show_menu(self):
         """Display interactive menu"""
@@ -57,6 +59,9 @@ class MenuManager:
         
         choice = input("\nEnter your choice (1-8): ")
         
+        if choice == "8":
+            return
+            
         model_map = {
             "1": "random",
             "2": "o1",
@@ -75,28 +80,63 @@ class MenuManager:
             if self.selected_model == "flux":
                 if self.prism.flux_generator is None:
                     self.prism.flux_generator = FluxGenerator(self.config, self.log)
-            
-            self.show_generation_menu()
-        elif choice == "8":
-            return
+                self.show_flux_menu()
+            else:
+                self.show_animated_model_menu()
         else:
             print("\nInvalid choice. Please try again.")
     
-    def show_generation_menu(self):
-        """Show generation options menu"""
+    def show_animated_model_menu(self):
+        """Show menu for animated model creation"""
         while True:
-            self.log.title("CREATION OPTIONS")
+            self.log.title("CREATION MODE")
+            current_model = self.config.model_config['model_selection']
+            print(f"\nCurrent Model: {current_model}")
+            
+            print("\nCreation Mode:")
+            print("1. Guided Creation (Wizard)")
+            print("2. Automated Evolution")
+            print("3. Back to Model Selection")
+            print("4. Back to Main Menu")
+            
+            choice = input("\nEnter your choice (1-4): ")
+            
+            if choice == "1":  # Wizard Mode
+                if self.dynamic_builder is None:
+                    self.dynamic_builder = DynamicBuilder(
+                        self.config,
+                        self.log,
+                        self.prism.generator,
+                        self.prism.db
+                    )
+                self.dynamic_builder.show_creation_wizard(model_name=current_model)
+                input("\nPress Enter to continue...")
+            elif choice == "2":  # Automated Evolution
+                self.show_generation_menu()
+            elif choice == "3":
+                self.show_creation_flow()
+                break
+            elif choice == "4":
+                break
+            else:
+                print("\nInvalid choice. Please try again.")
+    
+    def show_generation_menu(self):
+        """Show automated generation options menu"""
+        while True:
+            self.log.title("AUTOMATED EVOLUTION")
             print("\nCreation Mode:")
             print("1. Single Creation")
             print("2. Multiple Pieces")
             print("3. Continuous Studio")
-            print("4. Back to Model Selection")
-            print("5. Back to Main Menu")
+            print("4. Back to Creation Mode")
+            print("5. Back to Model Selection")
+            print("6. Back to Main Menu")
             
             current_model = self.config.model_config['model_selection']
             print(f"\nCurrent Model: {current_model}")
             
-            choice = input("\nEnter your choice (1-5): ")
+            choice = input("\nEnter your choice (1-6): ")
             
             if choice == "1":
                 self.prism.run_iteration()
@@ -121,9 +161,12 @@ class MenuManager:
                 except ValueError:
                     print("Please enter a valid number")
             elif choice == "4":
-                self.show_creation_flow()
+                self.show_animated_model_menu()
                 break
             elif choice == "5":
+                self.show_creation_flow()
+                break
+            elif choice == "6":
                 break
             else:
                 print("\nInvalid choice. Please try again.") 

@@ -213,9 +213,6 @@ class VariationManager:
                         new_pattern.update_scores(scores)
                         self.db.save_pattern(new_pattern)
                         
-                        # Update documentation
-                        self.generator.docs.update(new_pattern)
-                        
                         self.log.success(f"Successfully created variation {i+1}")
                         break  # Break retry loop on success
                     else:
