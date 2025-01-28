@@ -1,91 +1,74 @@
 // === USER'S CREATIVE CODE ===
-// 1. Define any classes at the top
-class Dot {
-  float x;
-  float baseY;
-  float phi;  // Random phase offset for more organic motion
+//--------------------------
+// 1. Define any classes
+//--------------------------
+class WindLine {
+  float angleOffset;  // base rotation around center
+  float spin;         // integer multiple rotational speed for perfect looping
+  float freq;         // wave frequency
+  float amplitude;    // wave amplitude
+  float offset;       // phase offset for the sine wave
+  float sw;           // stroke weight
+  color lineColor;    // stroke color
 
-  Dot(float x, float baseY, float phi) {
-    this.x = x;
-    this.baseY = baseY;
-    this.phi = phi;
+  WindLine() {
+    angleOffset = random(TWO_PI);
+    // spin must be an integer >= 1 for clean looping rotations
+    spin = floor(random(1, 4)); 
+    freq = random(0.005, 0.02);
+    amplitude = random(50, 150);
+    offset = random(10000); 
+    sw = random(1, 3);
+    // Monochromatic, bright grayscale with some alpha
+    lineColor = color(200 + random(55), 120);
   }
 
   void display(float progress) {
-    // Calculate a wave that goes to zero 4 times during the loop:
-    float wave = sin(4 * PI * progress);
+    pushMatrix();
+    // Rotate line by its offset + spinning factor
+    rotate(angleOffset + progress * TWO_PI * spin);
 
-    // Speed changes each quarter of the loop:
-    float spd = 1 + floor(progress * 4);
+    stroke(lineColor);
+    strokeWeight(sw);
+    noFill();
 
-    // Horizontal offset (changed from vertical offset)
-    float offset = wave * spd * 30 * sin(phi);
-
-    // Add spiral motion
-    // We'll revolve around (x, baseY) as progress goes from 0..1:
-    float swirlAngle = TWO_PI * 2 * progress + phi;  // two full rotations
-    float swirlRadius = 50 * progress;               // grows with progress
-    float swirlX = swirlRadius * cos(swirlAngle);
-    float swirlY = swirlRadius * sin(swirlAngle);
-
-    // Rainbow color
-    pushStyle();
-    colorMode(HSB, 1);
-    float hueVal = (phi / TWO_PI + progress) % 1;
-    fill(hueVal, 1, 1);
-    noStroke();
-    ellipse(x + offset + swirlX, baseY + swirlY, 5, 5);
-    popStyle();
-  }
-}
-
-// 2. Declare global variables
-PGraphics letterMask;
-ArrayList<Dot> dots = new ArrayList<Dot>();
-
-// 3. Define initSketch() for setup
-void initSketch() {
-  // REQUIRED - EXACT letterMask initialization
-    letterMask = createGraphics(1080, 1080);
-  letterMask.beginDraw();
-  letterMask.background(0);
-  letterMask.fill(255);
-  letterMask.textAlign(CENTER, CENTER);
-  letterMask.textSize(200);
-  letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
-  letterMask.endDraw();
-
-  // Populate an ArrayList of Dot objects only where the letterMask is white
-  // For a symmetrical design, we add mirrored dots about the Y-axis
-  int attempts = 10000; // Increase if needed for denser fill
-  for (int i = 0; i < attempts; i++) {
-    // Random X in [0..540] so we can mirror
-    float rx = random(0, 540);
-    float ry = random(-540, 540);
-
-    int mx = (int)(rx + 540);
-    int my = (int)(ry + 540);
-
-    // Check brightness in the mask
-    if (mx >= 0 && mx < 1080 && my >= 0 && my < 1080) {
-      float b = brightness(letterMask.get(mx, my));
-      if (b > 0) {
-        // Add a dot for +rx
-        dots.add(new Dot(rx, ry, random(TWO_PI)));
-        // And add a symmetrical partner for -rx (unless rx == 0)
-        if (rx != 0) {
-          dots.add(new Dot(-rx, ry, random(TWO_PI)));
-        }
-      }
+    beginShape();
+    // We'll draw a sinusoidal line from -400 to 400
+    for (float x = -400; x <= 400; x += 10) {
+      float phaseShift = progress * ( TWO_PI / freq ); // ensures wave loops perfectly
+      float y = sin(freq * (x + offset + phaseShift)) * amplitude;
+      vertex(x, y);
     }
+    endShape();
+
+    popMatrix();
   }
 }
 
-// 4. Define runSketch(progress) for animation
+//--------------------------
+// 2. Declare global variables
+//--------------------------
+WindLine[] lines;
+int numLines = 20;
+
+//--------------------------
+// 3. Define initSketch() - called once at start
+//--------------------------
+void initSketch() {
+  lines = new WindLine[numLines];
+  for (int i = 0; i < numLines; i++) {
+    lines[i] = new WindLine();
+  }
+}
+
+//--------------------------
+// 4. Define runSketch(progress) - called each frame
+//    progress goes from 0.0 to 1.0
+//--------------------------
 void runSketch(float progress) {
-  // Use each dot's display method
-  for (Dot d : dots) {
-    d.display(progress);
+  // Draw each wind line
+  for (int i = 0; i < numLines; i++) {
+    lines[i].display(progress);
   }
 }
 // END OF YOUR CREATIVE CODE
@@ -110,7 +93,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v9";
+        String renderPath = "renders/render_v1";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();

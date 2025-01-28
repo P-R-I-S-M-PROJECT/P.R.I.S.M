@@ -206,6 +206,15 @@ class DynamicBuilder:
     
     def _choose_base_techniques(self):
         """Let user choose base mathematical techniques"""
+        print("\nBase Mathematical Techniques")
+        print("---------------------------")
+        print("You can select specific techniques for each category, or press Enter to skip.")
+        print("If you skip all categories, the AI will intelligently select techniques based on:")
+        print("• Your custom guidelines and creative direction")
+        print("• Historical performance data")
+        print("• Technique synergy patterns")
+        print("• The chosen creative mode (static vs. dynamic)\n")
+        
         categories = {
             'geometry': self.config.technique_categories['geometry'],
             'motion': self.config.technique_categories['motion'],
@@ -219,8 +228,8 @@ class DynamicBuilder:
             
             while True:
                 try:
-                    choices = input(f"\nSelect {category} techniques (comma-separated numbers, 0 or Enter to skip): ")
-                    if not choices.strip() or choices.strip() == "0":
+                    choices = input(f"\nSelect {category} techniques (comma-separated numbers, Enter to skip): ")
+                    if not choices.strip():
                         break
                         
                     indices = [int(x.strip()) - 1 for x in choices.split(",")]
@@ -233,7 +242,7 @@ class DynamicBuilder:
         if self.selected_techniques:
             print(f"\nSelected techniques: {', '.join(self.selected_techniques)}")
         else:
-            print("\nNo specific techniques selected - using AI's creative judgment")
+            print("\nNo specific techniques selected - AI will analyze your requirements and select optimal techniques")
     
     def _choose_motion_style(self) -> str:
         """Choose the overall motion style"""
@@ -356,6 +365,7 @@ class DynamicBuilder:
     
     def _build_creative_prompt(self, motion: str, shapes: str, colors: str, pattern: str, custom_guidelines: str = "") -> dict:
         """Build the creative prompt from selected options"""
+        # Start with base prompt structure
         prompt = {
             "techniques": self.selected_techniques,
             "motion_style": motion,
@@ -365,6 +375,7 @@ class DynamicBuilder:
         }
         
         if custom_guidelines:
+            # Let the AI interpret and handle the guidelines directly
             prompt["custom_guidelines"] = custom_guidelines
             
         return prompt
@@ -452,11 +463,11 @@ class DynamicBuilder:
     def _run_sketch(self, render_path: str) -> bool:
         """Run the Processing sketch and wait for completion"""
         try:
-            # Create render directory
-            Path(render_path).mkdir(parents=True, exist_ok=True)
+            # Ensure render_path is relative to the renders directory
+            full_render_path = self.config.base_path / "renders" / render_path
             
             # Use the generator's run_sketch method
-            success, error = self.generator.run_sketch(Path(render_path))
+            success, error = self.generator.run_sketch(full_render_path)
             if not success and error:
                 self.log.error(f"Sketch error: {error}")
             return success

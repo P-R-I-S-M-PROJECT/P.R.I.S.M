@@ -95,10 +95,23 @@ class OpenAIO1Generator:
         historical_techniques = self.config.db_manager.get_historical_techniques(limit=5)
         avoid_patterns = self._get_avoid_patterns(recent_patterns, historical_techniques)
         
-        # Get random subset of techniques from each category for inspiration
-        geometry_techniques = self._get_random_techniques_from_category('geometry', 3)
-        motion_techniques = self._get_random_techniques_from_category('motion', 3)
-        pattern_techniques = self._get_random_techniques_from_category('patterns', 3)
+        # Only get random techniques if none were provided
+        additional_guidance = ""
+        if not techniques:
+            geometry_techniques = self._get_random_techniques_from_category('geometry', 3)
+            motion_techniques = self._get_random_techniques_from_category('motion', 3)
+            pattern_techniques = self._get_random_techniques_from_category('patterns', 3)
+            
+            additional_guidance = f"""
+=== SUGGESTED TECHNIQUES ===
+Form & Structure:
+• {', '.join(geometry_techniques)}
+
+Movement & Flow:
+• {', '.join(motion_techniques)}
+
+Pattern & Texture:
+• {', '.join(pattern_techniques)}"""
         
         return f"""=== PROCESSING SKETCH GENERATOR ===
 Create a visually appealing animation that loops smoothly over 6 seconds.
@@ -130,16 +143,7 @@ The system automatically handles these - DO NOT include them:
 === CREATIVE DIRECTION ===
 Consider exploring these techniques: {techniques}
 {f"Try something different than: {', '.join(avoid_patterns)}" if avoid_patterns else ""}
-
-=== TECHNIQUES & APPROACHES ===
-Form & Structure:
-• {', '.join(geometry_techniques)}
-
-Movement & Flow:
-• {', '.join(motion_techniques)}
-
-Pattern & Texture:
-• {', '.join(pattern_techniques)}
+{additional_guidance}
 
 === RETURN FORMAT ===
 Return your code between these markers:
@@ -560,52 +564,33 @@ Return your code between these markers:
     def generate_code(self, prompt_data: dict, custom_guidelines: str = None) -> Optional[str]:
         """Generate code using the wizard prompt data"""
         try:
-            # Check if this is a text-based requirement
-            is_text_requirement = custom_guidelines and any(word in custom_guidelines.lower() for word in ['text', 'spell', 'word', 'letter'])
-            
             # Build creative prompt from wizard data
-            creative_prompt = f"""Create a dynamic Processing animation with these characteristics:
+            creative_prompt = f"""Create a dynamic Processing animation with these characteristics:"""
 
-Base Techniques: {', '.join(prompt_data['techniques'])}
-Motion Style: {prompt_data['motion_style']}
-Shape Elements: {prompt_data['shape_elements']}
-Color Approach: {prompt_data['color_approach']}
-Pattern Type: {prompt_data['pattern_type']}"""
+            # If there are custom guidelines, make them the primary focus
+            if custom_guidelines:
+                creative_prompt = f"""{custom_guidelines}
 
-            # If text requirement, add specific mask-based guidance
-            if is_text_requirement:
-                creative_prompt += f"""
-
-=== CRITICAL: Text Integration Requirements ===
-You MUST follow these requirements EXACTLY to create organic text that emerges from patterns:
-
-1. Create Text Mask:
-   REQUIRED - Copy this initialization code exactly:
-   PGraphics letterMask;
-   letterMask = createGraphics(1080, 1080);
-   letterMask.beginDraw();
-   letterMask.background(0);
-   letterMask.fill(255);
-   letterMask.textAlign(CENTER, CENTER);
-   letterMask.textSize(200);  // Adjust size as needed
-   letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
-   letterMask.endDraw();
-
-2. Pattern Integration:
-   • Create an ArrayList of pattern elements (circles, particles, etc.)
-   • Use letterMask.get(x, y) to check if a point is inside text
-   • Only place/grow patterns where letterMask.get(x, y) brightness > 0
-   • Let the text emerge naturally from pattern behavior
-
-3. Animation:
-   • Use the progress variable to animate pattern elements
-   • Maintain smooth transitions and looping
-   • Keep the text readable but organic
-
-Custom Requirements: {custom_guidelines}"""
-            else:
-                creative_prompt += f"\nCustom Requirements: {custom_guidelines}" if custom_guidelines else ""
-
+=== IMPLEMENTATION REQUIREMENTS ==="""
+            
+            # Add selected techniques if any
+            if prompt_data['techniques']:
+                creative_prompt += f"\n\nRequired Techniques: {', '.join(prompt_data['techniques'])}"
+            
+            # Add other characteristics as supporting guidelines
+            supporting_elements = []
+            if prompt_data['motion_style']:
+                supporting_elements.append(f"Motion Style: {prompt_data['motion_style']}")
+            if prompt_data['shape_elements']:
+                supporting_elements.append(f"Shape Elements: {prompt_data['shape_elements']}")
+            if prompt_data['color_approach']:
+                supporting_elements.append(f"Color Approach: {prompt_data['color_approach']}")
+            if prompt_data['pattern_type']:
+                supporting_elements.append(f"Pattern Type: {prompt_data['pattern_type']}")
+            
+            if supporting_elements:
+                creative_prompt += "\n\nSupporting Characteristics:\n• " + "\n• ".join(supporting_elements)
+            
             creative_prompt += """
 
 Focus on smooth animation and visual harmony.
@@ -614,16 +599,6 @@ Keep the code modular and efficient."""
 
             # Generate code using the creative prompt
             code = self.generate_with_ai(creative_prompt)
-            
-            # If text requirement, verify mask approach was used
-            if is_text_requirement and code:
-                if 'createGraphics' not in code or 'PGraphics' not in code:
-                    self.log.info("Regenerating with stronger mask emphasis...")
-                    creative_prompt = creative_prompt.replace(
-                        "=== CRITICAL: Text Integration Requirements ===",
-                        "=== ABSOLUTELY REQUIRED - MUST USE MASK APPROACH EXACTLY AS SHOWN ==="
-                    )
-                    code = self.generate_with_ai(creative_prompt)
             
             return code
             
