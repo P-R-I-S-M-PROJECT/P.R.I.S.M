@@ -1,89 +1,144 @@
 // === USER'S CREATIVE CODE ===
-// ----------------------------------------------------
-// 1) Define any classes at the top
-// ----------------------------------------------------
+// =====================================================================
+// 1. Define classes at the top
+// =====================================================================
 class Agent {
-  float baseAngle;
-  float revolveSpeed;
-  float baseRadius;
-  float offset;
+  float x;         // Horizontal (column) position
+  float baseY;     // Base vertical position
+  float offset;    // Random offset for vertical oscillation
+  float size = 10; // Smaller shapes to avoid touching
+  int sides;       // Polygon sides
+  int currentColumn;   // Track which column this agent is in
+  color col;       // Current color of the agent
 
-  Agent(float a, float rs, float br, float off) {
-    baseAngle = a;
-    revolveSpeed = rs;
-    baseRadius = br;
+  Agent(float x_, float y_, int s, float off, int column, color initialCol) {
+    x = x_;
+    baseY = y_;
+    sides = s;
     offset = off;
+    currentColumn = column;
+    col = initialCol;
   }
 
-  PVector getPos(float t) {
-    // Position is determined by angle + time-driven rotation plus
-    // a subtle radial oscillation for dynamic movement
-    float angle = baseAngle + revolveSpeed * t;
-    float r = baseRadius + 50 * sin(t + offset);
-    return new PVector(cos(angle) * r, sin(angle) * r);
-  }
-}
+  void display(float progress) {
+    // Smooth looping from 0..1 => swirlAngle from 0..TWO_PI
+    float swirlAngle = progress * TWO_PI;
 
-// ----------------------------------------------------
-// 2) Declare global variables
-// ----------------------------------------------------
-Agent[] agents;
-int numAgents = 36; // Number of agents in the circle
+    // Vertical bobbing
+    float yPos = baseY + 20 * sin(swirlAngle + offset);
 
-// ----------------------------------------------------
-// 3) initSketch() - Called once at start
-// ----------------------------------------------------
-void initSketch() {
-  agents = new Agent[numAgents];
-  // Distribute agents around the center with random speeds and slight randomness
-  for (int i = 0; i < numAgents; i++) {
-    float angle = map(i, 0, numAgents, 0, TWO_PI);
-    float speed = random(2, 5);         // integer-ish rotation speeds for looping
-    float rad   = random(150, 250);     // base radius for each agent
-    float off   = random(TWO_PI);       // random offset for the radial oscillation
-    agents[i]   = new Agent(angle, speed, rad, off);
-  }
-}
-
-// ----------------------------------------------------
-// 4) runSketch(progress) - Called each frame
-//    progress goes from 0.0 to 1.0 over 6 seconds
-// ----------------------------------------------------
-void runSketch(float progress) {
-  // Convert progress [0..1] to a full cycle [0..2PI]
-  float t = progress * TWO_PI;
-
-  // Set up drawing style
-  noFill();
-  strokeWeight(2);
-
-  // Chromatic aberration offsets and colors
-  PVector[] colorOffsets = {
-    new PVector(  2,   0 ),  // slight shift right
-    new PVector(  0,   2 ),  // slight shift down
-    new PVector( -2,  -2 ),  // diagonal shift
-    new PVector(  0,   0 )   // original position (white)
-  };
-  color[] colors = {
-    color(255,   0,   0),
-    color(  0, 255,   0),
-    color(  0,   0, 255),
-    color(255)          // white
-  };
-
-  // Draw four overlapping polygons with small positional shifts
-  // to produce the chromatic aberration illusion
-  for (int c = 0; c < 4; c++) {
-    stroke(colors[c]);
+    // Draw the shape
     pushMatrix();
-    translate(colorOffsets[c].x, colorOffsets[c].y);
+    translate(x, yPos);
+    stroke(255);
+    strokeWeight(1);
+    fill(col);
     beginShape();
-    for (int i = 0; i < numAgents; i++) {
-      PVector pos = agents[i].getPos(t);
-      vertex(pos.x, pos.y);
+    for (int i = 0; i < sides; i++) {
+      float a = map(i, 0, sides, 0, TWO_PI);
+      vertex(size * cos(a), size * sin(a));
     }
     endShape(CLOSE);
     popMatrix();
+  }
+
+  // Move to a new column (adjust x, sides, and color)
+  void setColumn(int newCol) {
+    currentColumn = newCol;
+    sides = shapeForColumn[newCol]; // adopt this column's polygon sides
+    // Recompute x for new column
+    x = startX + newCol * colSpacing;
+    // Change color to a random rainbow color
+    col = rainbow[int(random(rainbow.length))];
+  }
+}
+
+// =====================================================================
+// 2. Declare global variables
+// =====================================================================
+Agent[] agents;
+int columns = 20;
+int rows = 10;
+int numAgents = columns * rows;
+
+int[] shapeForColumn = new int[columns]; // each column has a specific shape
+
+// Spacing variables
+float colSpacing = 30;
+float rowSpacing = 30;
+float startX, startY;
+
+// Rainbow colors
+color[] rainbow = {
+  color(255, 0, 0),
+  color(255, 127, 0),
+  color(255, 255, 0),
+  color(0, 255, 0),
+  color(0, 0, 255),
+  color(75, 0, 130),
+  color(148, 0, 211)
+};
+
+// Track timing for column jumps
+float lastCheck = 0;
+int jumpInterval = 500; // check every 500ms
+
+// =====================================================================
+// 3. Define initSketch() - Called once at start
+// =====================================================================
+void initSketch() {
+  // Assign a polygon side count to each column
+  for (int c = 0; c < columns; c++) {
+    shapeForColumn[c] = int(random(3, 7)); // 3..6 sides
+  }
+
+  // Create agents array
+  agents = new Agent[numAgents];
+
+  // Center them around (0,0)
+  startX = -(columns - 1) * colSpacing / 2.0;
+  startY = -(rows - 1) * rowSpacing / 2.0;
+
+  // Populate agents
+  int index = 0;
+  for (int c = 0; c < columns; c++) {
+    for (int r = 0; r < rows; r++) {
+      float x = startX + c * colSpacing;
+      float y = startY + r * rowSpacing;
+      float off = random(TWO_PI);
+      // Initial color is white
+      color initialCol = color(255);
+      agents[index++] = new Agent(x, y, shapeForColumn[c], off, c, initialCol);
+    }
+  }
+}
+
+// =====================================================================
+// 4. Define runSketch(progress) - Called each frame with progress [0..1]
+// =====================================================================
+void runSketch(float progress) {
+  // Check if enough time has passed to consider random column jumps
+  if (millis() - lastCheck > jumpInterval) {
+    lastCheck = millis();
+    // 1% chance for each agent to jump columns
+    for (int i = 0; i < numAgents; i++) {
+      if (random(1) < 0.01) {
+        // Move to a different column
+        int newC = agents[i].currentColumn;
+        // Ensure we pick a different column
+        while (newC == agents[i].currentColumn) {
+          newC = int(random(columns));
+        }
+        agents[i].setColumn(newC);
+      }
+    }
+  }
+
+  background(0);
+
+  // Display each agent
+  for (int i = 0; i < numAgents; i++) {
+    agents[i].display(progress);
   }
 }
 // END OF YOUR CREATIVE CODE

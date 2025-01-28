@@ -945,4 +945,74 @@ class DynamicBuilder:
                 custom_guidelines=settings.get('custom_guidelines', "")
             )
             
-        return self._generate_artwork(prompt) 
+        return self._generate_artwork(prompt)
+
+    def _get_custom_guidelines(self) -> str:
+        """Get custom guidelines from user for any creative mode"""
+        self.log.info("\nWould you like to add any custom instructions or requirements? (Enter to skip)")
+        self.log.info("Examples:")
+        self.log.info("- Create something that evokes feeling of 'endless scroll'")
+        self.log.info("- Make the animation feel like it's breathing")
+        self.log.info("- Use only curved lines, no straight edges")
+        
+        custom_guidelines = input("\nEnter custom instructions: ").strip()
+        return custom_guidelines if custom_guidelines else ""
+
+    def build_creative_prompt(self) -> dict:
+        """Build the creative prompt through user interaction"""
+        # Get creative mode first
+        mode = self._get_creative_mode()
+        prompt_data = {}
+        
+        if mode == "Custom Guidelines":
+            custom_guidelines = self._get_custom_guidelines()
+            if not custom_guidelines:
+                self.log.warning("No custom guidelines provided. Please provide some direction.")
+                return None
+            prompt_data["custom_guidelines"] = custom_guidelines
+            
+        elif mode == "Text Art":
+            text = self._get_text_input()
+            if not text:
+                self.log.warning("No text provided for text art.")
+                return None
+            prompt_data["is_text_art"] = True
+            prompt_data["text"] = text
+            
+        # For optical illusions, get categories
+        if mode == "Optical Illusions & Visual Puzzles":
+            categories = self._get_illusion_categories()
+            if categories:
+                prompt_data["illusion_categories"] = categories
+
+        # Get base techniques
+        techniques = self._get_techniques()
+        if not techniques:
+            self.log.warning("No techniques selected.")
+            return None
+        prompt_data["techniques"] = techniques
+
+        # Get creative direction
+        motion = self._get_motion_style()
+        shapes = self._get_shape_elements()
+        colors = self._get_color_approach()
+        pattern = self._get_pattern_type()
+
+        if not all([motion, shapes, colors, pattern]):
+            self.log.warning("Missing required creative direction elements.")
+            return None
+
+        prompt_data.update({
+            "motion_style": motion,
+            "shape_elements": shapes,
+            "color_approach": colors,
+            "pattern_type": pattern
+        })
+
+        # Always get custom guidelines after other selections
+        if "custom_guidelines" not in prompt_data:
+            custom_guidelines = self._get_custom_guidelines()
+            if custom_guidelines:
+                prompt_data["custom_guidelines"] = custom_guidelines
+
+        return prompt_data 

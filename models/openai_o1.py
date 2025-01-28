@@ -635,28 +635,33 @@ Return your code between these markers:
 
             # Add creative direction from prompt data
             creative_direction = []
-            if prompt_data['techniques']:
+            if prompt_data.get('techniques'):
                 creative_direction.append(f"Required Techniques: {', '.join(prompt_data['techniques'])}")
-            if prompt_data['motion_style']:
+            if prompt_data.get('motion_style'):
                 creative_direction.append(f"Motion Style: {prompt_data['motion_style']}")
-            if prompt_data['shape_elements']:
+            if prompt_data.get('shape_elements'):
                 creative_direction.append(f"Shape Elements: {prompt_data['shape_elements']}")
-            if prompt_data['color_approach']:
+            if prompt_data.get('color_approach'):
                 creative_direction.append(f"Color Approach: {prompt_data['color_approach']}")
-            if prompt_data['pattern_type']:
+            if prompt_data.get('pattern_type'):
                 creative_direction.append(f"Pattern Type: {prompt_data['pattern_type']}")
 
             if creative_direction:
                 base_prompt += "\n\n=== CREATIVE DIRECTION ===\n• " + "\n• ".join(creative_direction)
 
-            # Add custom guidelines if provided
-            if custom_guidelines:
-                base_prompt += f"\n\n=== CUSTOM REQUIREMENTS ===\n{custom_guidelines}"
+            # Add mode-specific requirements
+            if prompt_data.get("illusion_categories"):
+                base_prompt += f"\n\n=== OPTICAL ILLUSION REQUIREMENTS ===\nCreate a dynamic optical illusion using these categories: {', '.join(prompt_data['illusion_categories'])}\nFocus on strong perceptual impact and smooth execution."
 
-                # Check if this is text art
-                if prompt_data.get("is_text_art"):
-                    text = prompt_data.get("text", "PRISM")
-                    base_prompt += "\n\n" + self._get_text_requirements(text)
+            # Add custom guidelines from either source
+            guidelines = prompt_data.get("custom_guidelines") or custom_guidelines
+            if guidelines:
+                base_prompt += f"\n\n=== CUSTOM REQUIREMENTS ===\n{guidelines}"
+
+            # Add text-specific requirements if needed
+            if prompt_data.get("is_text_art"):
+                text = prompt_data.get("text", "PRISM")
+                base_prompt += "\n\n" + self._get_text_requirements(text)
 
             # Add animation guidelines
             base_prompt += (
