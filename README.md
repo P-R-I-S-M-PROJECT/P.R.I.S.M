@@ -135,33 +135,66 @@ Create evolving, animated artworks:
 PRISM's variation system allows deep exploration of artistic ideas:
 
 ### Features
-- Create multiple variations of any artwork
-- Specify custom modification instructions
-- Batch generation of variations
-- Preserve artistic lineage
-- Maintain technique consistency
+- Create multiple variations of any artwork (1-10 variations per session)
+- Specify custom modification instructions or use guided categories
+- Batch generation of variations with automatic validation
+- Preserve artistic lineage through parent-child relationships
+- Maintain technique consistency across variations
 
-### Variation Types
-1. **Style Variations**
-   - Modify artistic approach
-   - Explore different techniques
-   - Maintain core subject matter
+### Modification Categories
+1. **Motion**
+   - Speed adjustments
+   - Wave and spiral motions
+   - Direction changes
+   - Bounce effects
 
-2. **Subject Variations**
-   - Keep artistic style
-   - Change primary elements
-   - Explore new compositions
+2. **Shapes**
+   - Geometric transformations
+   - Size modifications
+   - Density adjustments
+   - Pattern influences
 
-3. **Technical Variations**
-   - Adjust parameters
-   - Modify algorithms
-   - Fine-tune animations
+3. **Colors**
+   - Color scheme changes
+   - Monochrome conversions
+   - Palette shifts
+   - Opacity variations
 
-### Batch Processing
-- Generate multiple variations at once
-- Specify number of variations (1-10)
-- Review and compare results
-- Select and refine favorites
+4. **Pattern**
+   - Density modifications
+   - Randomness injection
+   - Symmetry adjustments
+   - Rotation effects
+
+5. **Custom**
+   - Free-form instructions
+   - Complex combinations
+   - Artistic experiments
+   - Style fusion
+
+### Variation Flow
+1. **Selection**
+   - Choose source artwork
+   - View artwork type (Dynamic/Static)
+   - Access metadata and techniques
+
+2. **Configuration**
+   - Select number of variations
+   - Choose modification category
+   - Specify custom instructions
+   - Set batch parameters
+
+3. **Generation**
+   - Automatic code adaptation
+   - Validation checks
+   - Error recovery
+   - Progress tracking
+
+4. **Results**
+   - Preview variations
+   - Compare with original
+   - Save successful pieces
+   - Document modifications
 
 ## 📈 Analysis & Evolution
 
