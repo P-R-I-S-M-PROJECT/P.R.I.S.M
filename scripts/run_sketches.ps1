@@ -91,7 +91,7 @@ try {
 } catch {
     Write-Error "Error copying sketch file: $_"
     return $false
-}
+    }
 
 Write-Host "Starting with RenderPath: $RenderPath"
 Write-Host "Using sketch path: $sketchPath"
@@ -120,7 +120,7 @@ try {
     $processStartInfo.RedirectStandardOutput = $true
     $processStartInfo.RedirectStandardError = $true
     $processStartInfo.CreateNoWindow = $true
-    
+
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $processStartInfo
     
@@ -141,11 +141,11 @@ try {
             Write-Host "Error: $($EventArgs.Data)" -ForegroundColor Red
         }
     }
-    
+
     # Register event handlers
     $outputEvent = Register-ObjectEvent -InputObject $process -EventName OutputDataReceived -Action $outputScriptBlock
     $errorEvent = Register-ObjectEvent -InputObject $process -EventName ErrorDataReceived -Action $errorScriptBlock
-    
+
     $startTime = Get-Date
     $process.Start() | Out-Null
     $processId = $process.Id
@@ -153,7 +153,7 @@ try {
     # Begin async output reading
     $process.BeginOutputReadLine()
     $process.BeginErrorReadLine()
-    
+
     # Wait for frames to be generated
     $framesComplete = $false
     $lastFrameCount = 0
@@ -217,7 +217,7 @@ try {
         $Metadata | Out-File -FilePath $metadataFile -Encoding UTF8
         
         & $ffmpegPath -framerate 60 -i "$RenderPath\frame-%04d.png" -c:v libx264 -pix_fmt yuv420p -crf 17 $outputFile
-        
+
         if (Test-Path $outputFile) {
             Move-Item $outputFile $finalFile -Force
             Write-Host "Video saved as: $finalFile"
@@ -225,7 +225,7 @@ try {
             return $true
         }
     }
-    
+
     return $false
     
 } catch {
@@ -250,7 +250,7 @@ try {
             } catch {
                 Write-Host "Process already terminated: $($_.ProcessName)"
             }
-        }
+}
         
     # Save PDE snapshot after all cleanup is done
     $sketchCopy = Join-Path $RenderPath "render_v$renderVersion.pde"

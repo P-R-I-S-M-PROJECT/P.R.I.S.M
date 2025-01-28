@@ -33,13 +33,109 @@ class DynamicBuilder:
         print("════════════════════════════════════════════════════════════════════════════════\n")
         
         # Get any custom guidelines first
-        print("\nDo you have any specific requirements or guidelines for this piece?")
-        print("(e.g., 'spell out PRISM', 'use only squares', 'make it look like a galaxy')")
-        print("Press Enter to skip or input your guidelines:")
-        custom_guidelines = input().strip()
+        print("\nChoose Creative Mode:")
+        print("1. Particle Systems (physics-based animations)")
+        print("2. Geometric Transformations (shape morphing)")
+        print("3. Pattern Generation (recursive/emergent)")
+        print("4. Text Art (shape-based/organic)")
+        print("5. Custom Guidelines")
+        print("\nEnter choice (1-5) or press Enter to skip: ")
+        mode_choice = input().strip()
+        
+        custom_guidelines = ""
+        if mode_choice:
+            if mode_choice == "1":  # Particle Systems
+                print("\nParticle System Options:")
+                print("1. Galaxy/Star system")
+                print("2. Flocking/Swarming")
+                print("3. Particle Attraction")
+                print("4. Rain/Snow simulation")
+                behavior = input("Choose particle behavior (1-4): ").strip()
+                
+                behaviors = {
+                    "1": "Create a galaxy-like system with stars orbiting a central point, using gravitational forces",
+                    "2": "Implement a flocking system where particles follow emergent swarm behavior",
+                    "3": "Design particles that attract/repel based on proximity and forces",
+                    "4": "Simulate natural phenomena with particles affected by wind and gravity"
+                }
+                custom_guidelines = behaviors.get(behavior, behaviors["1"])
+                
+            elif mode_choice == "2":  # Geometric Transformations
+                print("\nGeometric Options:")
+                print("1. Sacred Geometry")
+                print("2. Tessellation")
+                print("3. Fractal Growth")
+                print("4. Shape Morphing")
+                geometry = input("Choose geometric style (1-4): ").strip()
+                
+                geometries = {
+                    "1": "Transform between sacred geometry patterns (flower of life, metatron's cube, etc)",
+                    "2": "Create evolving tessellation patterns that fill the space",
+                    "3": "Generate recursive fractal patterns that grow and evolve",
+                    "4": "Morph between different geometric shapes smoothly"
+                }
+                custom_guidelines = geometries.get(geometry, geometries["1"])
+                
+            elif mode_choice == "3":  # Pattern Generation
+                print("\nPattern Options:")
+                print("1. Reaction Diffusion")
+                print("2. Cellular Automata")
+                print("3. Flow Fields")
+                print("4. Wave Patterns")
+                pattern = input("Choose pattern type (1-4): ").strip()
+                
+                patterns = {
+                    "1": "Create organic patterns using reaction-diffusion algorithms",
+                    "2": "Generate evolving patterns using cellular automata rules",
+                    "3": "Design dynamic flow fields that guide particle movement",
+                    "4": "Create interference patterns using overlapping waves"
+                }
+                custom_guidelines = patterns.get(pattern, patterns["1"])
+                
+            elif mode_choice == "4":  # Text Art
+                print("\nWhat text would you like to create? (e.g. 'PRISM', 'Hello', etc.)")
+                desired_text = input().strip() or "PRISM"  # Default to PRISM if empty
+                
+                # NEW: Ask for additional instructions
+                print("\nWould you like to add any additional instructions? (e.g. 'only vertical motion', 'use specific colors', etc.)")
+                print("Press Enter to skip")
+                extra_instructions = input("> ").strip()
+                
+                print("\nText Art Options:")
+                print("1. Particle Text")
+                print("2. Pattern-Filled Text")
+                print("3. Emergent Text")
+                print("4. Morphing Text")
+                print("\nEnter choice (1-4) or press Enter to let AI choose: ")
+                text_style = input().strip()
+                
+                text_styles = {
+                    "1": f"Form the text '{desired_text}' using dynamic particle systems that assemble and flow",
+                    "2": f"Fill the text '{desired_text}' with intricate patterns and motion",
+                    "3": f"Create the text '{desired_text}' that emerges from underlying patterns",
+                    "4": f"Transform flowing shapes that morph into the text '{desired_text}'"
+                }
+                custom_guidelines = text_styles.get(text_style, f"Create organic text spelling '{desired_text}' through shape-based patterns and dynamic motion")
+                
+                # Append extra instructions if provided
+                if extra_instructions:
+                    custom_guidelines += f"\nAdditional Requirements: {extra_instructions}"
+            
+            elif mode_choice == "5":  # Custom Guidelines
+                print("\nEnter your custom creative guidelines:")
+                custom_guidelines = input().strip()
         
         # If they provided guidelines but want to skip wizard, ask if they want to skip
         if custom_guidelines:
+            # Check if this is a text-based requirement
+            is_text_requirement = any(word in custom_guidelines.lower() for word in ['text', 'spell', 'word', 'letter'])
+            
+            if is_text_requirement:
+                print("\nNOTE: For text-based art, we'll use:")
+                print("• Shape-based letter formation (NO direct text() calls)")
+                print("• PGraphics masks for letter boundaries")
+                print("• Dynamic patterns that organically reveal text")
+            
             print("\nWould you like to:")
             print("1. Use guidelines with wizard (recommended)")
             print("2. Use only guidelines (skip wizard)")
@@ -298,8 +394,12 @@ class DynamicBuilder:
                 if attempt > 0:
                     self.log.info(f"Generation attempt {attempt+1}/{max_retries}")
                 
+                # Get custom guidelines if they exist
+                custom_guidelines = prompt_data.get("custom_guidelines", None)
+                
                 # Generate the code
-                code = generator.generate_code(prompt_data)
+                code = generator.generate_code(prompt_data, custom_guidelines=custom_guidelines)
+                    
                 if not code:
                     if attempt < max_retries - 1:
                         continue
@@ -362,7 +462,7 @@ class DynamicBuilder:
             return success
             
         except Exception as e:
-            self.log.error(f"Error running sketch: {e}")
+            self.log.error(f"Error running sketch: {str(e)}")
             if self.config.debug_mode:
                 import traceback
                 self.log.debug(traceback.format_exc())

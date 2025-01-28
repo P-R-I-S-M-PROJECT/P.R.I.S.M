@@ -32,46 +32,17 @@ class OpenAIO1Generator:
         self.current_model = 'o1-mini'
         return self.model_ids['o1-mini']
     
-    def generate_with_ai(self, prompt: str, skip_generation_prompt: bool = False, is_variation: bool = False) -> Optional[str]:
-        """Generate code using OpenAI API with better error handling"""
+    def generate_with_ai(self, prompt: str, skip_generation_prompt: bool = False, is_variation: bool = False, retry_count: int = 0) -> Optional[str]:
+        """Generate code using OpenAI API with better error handling and retries"""
         try:
             if skip_generation_prompt:
                 full_prompt = prompt
             else:
-                # Add the O1-specific framework around the creative prompt
-                full_prompt = f"""=== PROCESSING SKETCH GENERATOR ===
-Create a visually appealing animation that loops smoothly over 6 seconds.
-Let your creativity guide the direction - feel free to explore and experiment.
-
-=== REQUIRED FUNCTIONS ===
-You MUST define these two functions:
-1. void initSketch() - Called once at start
-2. void runSketch(float progress) - Called each frame with progress (0.0 to 1.0)
-
-=== SYSTEM FRAMEWORK ===
-The system automatically handles these - DO NOT include them:
-• void setup() or draw() functions
-• size(1080, 1080) and frameRate settings
-• background(0) or any background clearing
-• translate(width/2, height/2) for centering
-• Frame saving and program exit
-
-=== CODE STRUCTURE ===
-1. Define any classes at the top
-2. Declare global variables
-3. Define initSketch() for setup
-4. Define runSketch(progress) for animation
-• The canvas is already centered at (0,0)
-• Initialize all variables with values
-• Use RGB values for colors (e.g., stroke(255, 0, 0) for red)
-
-=== CREATIVE DIRECTION ===
-{prompt}
-
-=== RETURN FORMAT ===
-Return your code between these markers:
-// YOUR CREATIVE CODE GOES HERE
-// END OF YOUR CREATIVE CODE"""
+                full_prompt = self._build_generation_prompt(prompt)
+            
+            # If this is a retry, build error-specific prompt
+            if retry_count > 0:
+                full_prompt = self._build_error_prompt(prompt, self.last_error) if hasattr(self, 'last_error') else prompt
             
             # Log the full prompt being sent
             self.log.debug(f"\n=== SENDING TO AI ===\n{full_prompt}\n==================\n")
@@ -90,48 +61,31 @@ Return your code between these markers:
             if not response.choices:
                 self.log.error("No response generated from AI")
                 return None
-                
-            # Log the raw response first (this is safe)
+            
+            # Process response and validate
             raw_content = response.choices[0].message.content
             self.log.debug(f"\n=== AI RESPONSE ===\n{raw_content}\n==================\n")
-            
-            # Then try to log any available metadata
-            self.log.debug("\n=== RESPONSE METADATA ===")
-            try:
-                self.log.debug(f"Model: {response.model}")
-                self.log.debug(f"Usage: {response.usage}")
-                self.log.debug(f"Created: {response.created}")
-            except AttributeError as e:
-                self.log.debug(f"Some metadata not available: {e}")
-            self.log.debug("==================\n")
             
             code = self._extract_code_from_response(raw_content, is_variation)
             if not code:
                 self.log.debug("Failed to extract code from response")
-                return raw_content.strip()  # Return the raw content if no markers found
-                
-            # Log the extracted code
-            self.log.debug(f"\n=== EXTRACTED CODE ===\n{code}\n==================\n")
+                return raw_content.strip()
             
-            # Validate creative code first, using is_variation to determine validation type
+            # Validate and store any error for retry context
             is_valid, error_msg = self.validate_creative_code(code, is_snippet=is_variation)
             if not is_valid:
+                self.last_error = error_msg
                 self.log.debug(f"\n=== VALIDATION ERROR ===\nCreative validation failed: {error_msg}\n==================\n")
                 raise ValueError(f"Creative validation: {error_msg}")
             
-            # Convert any remaining JavaScript syntax to Processing
-            code = self._convert_to_processing(code)
+            # Clear last error if successful
+            if hasattr(self, 'last_error'):
+                delattr(self, 'last_error')
             
-            # Final safety check
-            if not self._is_safe_code(code):
-                self.log.debug("\n=== VALIDATION ERROR ===\nFailed final safety check\n==================\n")
-                return None
-                
             return code
             
         except Exception as e:
             self.log.error(f"AI generation error: {str(e)}")
-            self.log.debug(f"Current model: {self.current_model}, Selected model ID: {selected_model if 'selected_model' in locals() else 'not selected yet'}")
             return None
 
     def _build_generation_prompt(self, techniques: str) -> str:
@@ -224,12 +178,43 @@ Return your code between these markers:
     def _clean_code(self, code: str, is_variation: bool = False) -> str:
         """Clean and prepare user code, ensuring proper structure"""
         try:
+            # Fix common letterMask issues first
+            code = re.sub(r'letterMask\s*\.\s*letterMask', 'letterMask', code)  # Fix double reference
+            code = re.sub(r'letterMask\s*\.\s*$', 'letterMask.', code)  # Fix dangling dot
+            code = re.sub(r'letterMask\s*\.\s*\n', 'letterMask.\n', code)  # Fix dot with newline
+            
+            # Auto-fix missing letterMask.background(0) if needed
+            if 'letterMask.beginDraw()' in code and not re.search(r'letterMask\s*\.\s*background\s*\(\s*0\.?0?\s*\)', code):
+                code = code.replace(
+                    'letterMask.beginDraw();',
+                    'letterMask.beginDraw();\n  letterMask.background(0);'
+                )
+            
+            # Fix specific letterMask initialization sequence
+            if 'letterMask.beginDraw()' in code:
+                mask_init = """  letterMask = createGraphics(1080, 1080);
+  letterMask.beginDraw();
+  letterMask.background(0);
+  letterMask.fill(255);
+  letterMask.textAlign(CENTER, CENTER);
+  letterMask.textSize(200);
+  letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
+  letterMask.endDraw();"""
+                
+                # Replace any existing letterMask initialization with the correct sequence
+                code = re.sub(
+                    r'letterMask\s*=\s*createGraphics\s*\([^)]*\)[^;]*;.*?letterMask\.endDraw\s*\(\s*\)\s*;',
+                    mask_init,
+                    code,
+                    flags=re.DOTALL
+                )
+            
             # Remove any setup() or draw() functions
             code = re.sub(r'void\s+setup\s*\(\s*\)\s*{[^}]*}', '', code)
             code = re.sub(r'void\s+draw\s*\(\s*\)\s*{[^}]*}', '', code)
             
-            # Remove any system calls that are handled by the framework
-            code = re.sub(r'\bbackground\s*\([^)]*\);', '', code)
+            # Remove system calls but preserve letterMask calls
+            code = re.sub(r'(?<!letterMask\.)\bbackground\s*\([^)]*\);', '', code)  # Only remove non-letterMask background calls
             code = re.sub(r'\bsize\s*\([^)]*\);', '', code)
             code = re.sub(r'\bframeRate\s*\([^)]*\);', '', code)
             code = re.sub(r'\btranslate\s*\(\s*width\s*/\s*2[^)]*\);', '', code)
@@ -237,23 +222,9 @@ Return your code between these markers:
             code = re.sub(r'\bsaveFrame\s*\([^)]*\);', '', code)
             code = re.sub(r'\bexit\s*\(\s*\);', '', code)
             
-            # Fix common syntax issues
-            code = re.sub(r'(\w+)\s*\.\s*(\w+)', r'\1.\2', code)  # Fix spaced dots
-            code = re.sub(r'for\s*\(\s*int\s+(\w+)\s*=\s*0\s*;\s*\1\s*<\s*(\w+)\s*\.\s*(\w+)\s*;', r'for (int \1 = 0; \1 < \2.\3;', code)  # Fix for loop syntax
-            
-            # Fix malformed function declarations where comments merge with function
-            code = re.sub(r'([^\n]+)void\s+(\w+)\s*\(', r'\1\nvoid \2(', code)
-            
             # Clean up empty lines and whitespace
             code = re.sub(r'\n\s*\n\s*\n', '\n\n', code)
             code = code.strip()
-            
-            # Only add missing functions for non-variation code
-            if not is_variation:
-                if not re.search(r'\bvoid\s+initSketch\s*\(\s*\)', code):
-                    code += '\n\nvoid initSketch() {\n  // Initialize sketch\n}'
-                if not re.search(r'\bvoid\s+runSketch\s*\(\s*float\s+\w+\s*\)', code):
-                    code += '\n\nvoid runSketch(float progress) {\n  // Update sketch\n}'
             
             return code
             
@@ -307,15 +278,14 @@ Return your code between these markers:
             return False, "Empty code"
         
         # Check for critical system-level functions that would break the sketch
-        # Use more precise patterns to avoid false positives
         critical_forbidden = {
-            r'(?<!\.)\bsize\s*\(': 'Contains size() call',  # Negative lookbehind to avoid matching list.size()
-            r'(?<!\.)\bbackground\s*\(': 'Contains background() call',
+            r'(?<!\.)\bsize\s*\(': 'Contains size() call',
+            r'(?<!letterMask\.)\bbackground\s*\(': 'Contains background() call',  # Allow letterMask.background()
             r'(?<!\.)\bframeRate\s*\(': 'Contains frameRate() call',
-            r'(?<!\.)\bdraw\s*\(\s*\)': 'Contains draw() function',  # Match function definition
+            r'(?<!\.)\bdraw\s*\(\s*\)': 'Contains draw() function',
         }
         
-        # Check for critical forbidden elements with better pattern matching
+        # Check for critical forbidden elements
         for pattern, error in critical_forbidden.items():
             if re.search(pattern, code):
                 return False, error
@@ -330,6 +300,44 @@ Return your code between these markers:
             line = line.strip()
             if any(re.search(pattern, line) for pattern in translation_patterns):
                 return False, "Contains origin re-centering - coordinates are already centered"
+        
+        # For text-based art, verify proper mask usage with more flexible patterns
+        if 'text(' in code:
+            required_mask_patterns = [
+                r'PGraphics\s+letterMask\s*;',
+                r'letterMask\s*=\s*createGraphics\s*\(\s*1080\s*,\s*1080\s*\)',
+                r'letterMask\s*\.\s*beginDraw\s*\(\s*\)',
+                r'letterMask\s*\.\s*background\s*\(\s*0\.?0?\s*\)',
+                r'letterMask\s*\.\s*fill\s*\(\s*255\s*\)',
+                r'letterMask\s*\.\s*textAlign\s*\(\s*CENTER\s*,\s*CENTER\s*\)',
+                r'letterMask\s*\.\s*textSize\s*\(\s*\d+',
+                r'letterMask\s*\.\s*text\s*\(',
+                r'letterMask\s*\.\s*endDraw\s*\(\s*\)'
+            ]
+            
+            # Check for missing mask elements with regex patterns
+            missing_elements = []
+            for pattern in required_mask_patterns:
+                if not re.search(pattern, code, re.IGNORECASE | re.MULTILINE):
+                    missing_elements.append(pattern)
+            
+            if missing_elements:
+                # Auto-fix common issues in _clean_code before failing
+                cleaned = self._clean_code(code)
+                # Recheck after cleaning
+                still_missing = []
+                for pattern in required_mask_patterns:
+                    if not re.search(pattern, cleaned, re.IGNORECASE | re.MULTILINE):
+                        still_missing.append(pattern)
+                
+                if still_missing:
+                    return False, f"Missing required mask elements: {', '.join(still_missing)}"
+            
+            # Check if text() is used directly on the canvas (not through mask)
+            lines = code.split('\n')
+            for line in lines:
+                if 'text(' in line and not 'letterMask.text(' in line:
+                    return False, "Text must only be drawn in the letterMask"
         
         # For non-snippets, ensure required functions exist with proper signatures
         if not is_snippet:
@@ -505,6 +513,8 @@ Shape Elements: {prompt_data["shape_elements"]}
 Color Approach: {prompt_data["color_approach"]}
 Pattern Type: {prompt_data["pattern_type"]}
 
+{f'Custom Requirements: {prompt_data["custom_guidelines"]}' if "custom_guidelines" in prompt_data and prompt_data["custom_guidelines"] else ''}
+
 Focus on smooth animation and visual harmony.
 Use the progress variable (0.0 to 1.0) for animation timing.
 Keep the code modular and efficient."""
@@ -547,9 +557,12 @@ Return your code between these markers:
         # Use the standard generation pipeline with the wizard prompt
         return self.generate_with_ai(full_prompt, skip_generation_prompt=True)
 
-    def generate_code(self, prompt_data: dict) -> Optional[str]:
+    def generate_code(self, prompt_data: dict, custom_guidelines: str = None) -> Optional[str]:
         """Generate code using the wizard prompt data"""
         try:
+            # Check if this is a text-based requirement
+            is_text_requirement = custom_guidelines and any(word in custom_guidelines.lower() for word in ['text', 'spell', 'word', 'letter'])
+            
             # Build creative prompt from wizard data
             creative_prompt = f"""Create a dynamic Processing animation with these characteristics:
 
@@ -557,15 +570,178 @@ Base Techniques: {', '.join(prompt_data['techniques'])}
 Motion Style: {prompt_data['motion_style']}
 Shape Elements: {prompt_data['shape_elements']}
 Color Approach: {prompt_data['color_approach']}
-Pattern Type: {prompt_data['pattern_type']}
+Pattern Type: {prompt_data['pattern_type']}"""
+
+            # If text requirement, add specific mask-based guidance
+            if is_text_requirement:
+                creative_prompt += f"""
+
+=== CRITICAL: Text Integration Requirements ===
+You MUST follow these requirements EXACTLY to create organic text that emerges from patterns:
+
+1. Create Text Mask:
+   REQUIRED - Copy this initialization code exactly:
+   PGraphics letterMask;
+   letterMask = createGraphics(1080, 1080);
+   letterMask.beginDraw();
+   letterMask.background(0);
+   letterMask.fill(255);
+   letterMask.textAlign(CENTER, CENTER);
+   letterMask.textSize(200);  // Adjust size as needed
+   letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
+   letterMask.endDraw();
+
+2. Pattern Integration:
+   • Create an ArrayList of pattern elements (circles, particles, etc.)
+   • Use letterMask.get(x, y) to check if a point is inside text
+   • Only place/grow patterns where letterMask.get(x, y) brightness > 0
+   • Let the text emerge naturally from pattern behavior
+
+3. Animation:
+   • Use the progress variable to animate pattern elements
+   • Maintain smooth transitions and looping
+   • Keep the text readable but organic
+
+Custom Requirements: {custom_guidelines}"""
+            else:
+                creative_prompt += f"\nCustom Requirements: {custom_guidelines}" if custom_guidelines else ""
+
+            creative_prompt += """
 
 Focus on smooth animation and visual harmony.
 Use the progress variable (0.0 to 1.0) for animation timing.
 Keep the code modular and efficient."""
 
             # Generate code using the creative prompt
-            return self.generate_with_ai(creative_prompt)
+            code = self.generate_with_ai(creative_prompt)
+            
+            # If text requirement, verify mask approach was used
+            if is_text_requirement and code:
+                if 'createGraphics' not in code or 'PGraphics' not in code:
+                    self.log.info("Regenerating with stronger mask emphasis...")
+                    creative_prompt = creative_prompt.replace(
+                        "=== CRITICAL: Text Integration Requirements ===",
+                        "=== ABSOLUTELY REQUIRED - MUST USE MASK APPROACH EXACTLY AS SHOWN ==="
+                    )
+                    code = self.generate_with_ai(creative_prompt)
+            
+            return code
             
         except Exception as e:
             self.log.error(f"Error in code generation: {str(e)}")
-            return None 
+            return None
+
+    def _build_creative_prompt(self, motion: str, shapes: str, colors: str, pattern: str, custom_guidelines: str = "") -> dict:
+        """Build the creative prompt from selected options"""
+        prompt = {
+            "techniques": self.selected_techniques,
+            "motion_style": motion,
+            "shape_elements": shapes,
+            "color_approach": colors,
+            "pattern_type": pattern,
+        }
+        
+        if custom_guidelines:
+            prompt["custom_guidelines"] = custom_guidelines
+            
+        # Check if this is a text-based requirement
+        is_text_requirement = custom_guidelines and any(word in custom_guidelines.lower() for word in ['text', 'spell', 'word', 'letter'])
+        
+        # If text requirement, add specific mask-based guidance
+        if is_text_requirement:
+            prompt["text_requirements"] = """
+=== CRITICAL: Text Integration Requirements ===
+You MUST follow these requirements EXACTLY to create organic text that emerges from patterns:
+
+1. Create Text Mask:
+   REQUIRED - Copy this initialization code exactly:
+   PGraphics letterMask;
+   letterMask = createGraphics(1080, 1080);
+   letterMask.beginDraw();
+   letterMask.background(0);
+   letterMask.fill(255);
+   letterMask.textAlign(CENTER, CENTER);
+   letterMask.textSize(200);  // Adjust size as needed
+   letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
+   letterMask.endDraw();
+
+2. Pattern Integration:
+   • Create an ArrayList of pattern elements (circles, particles, etc.)
+   • Use letterMask.get(x, y) to check if a point is inside text
+   • Only place/grow patterns where letterMask.get(x, y) brightness > 0
+   • Let the text emerge naturally from pattern behavior
+
+3. Animation:
+   • Use the progress variable to animate pattern elements
+   • Maintain smooth transitions and looping
+   • Keep the text readable but organic
+
+Custom Requirements: {custom_guidelines}"""
+            
+        return prompt 
+
+    def _build_error_prompt(self, code: str, error_msg: str = None) -> str:
+        """Build error prompt for retry attempts with explicit requirements"""
+        if 'letterMask.background(0)' in error_msg:
+            return f"""
+The previous code had the following error: {error_msg}
+
+You MUST fix it by ensuring the code EXACTLY includes this line after letterMask.beginDraw():
+    letterMask.background(0);
+
+The complete required sequence is:
+    letterMask = createGraphics(1080, 1080);
+    letterMask.beginDraw();
+    letterMask.background(0);  // <-- THIS LINE IS REQUIRED
+    letterMask.fill(255);
+    letterMask.textAlign(CENTER, CENTER);
+    letterMask.textSize(200);
+    letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
+    letterMask.endDraw();
+
+Here is the previous code:
+{code}
+
+Return ONLY the creative code between the markers:
+// YOUR CREATIVE CODE GOES HERE
+// END OF YOUR CREATIVE CODE
+"""
+        elif 'text(' in error_msg:
+            return f"""
+The previous code had the following error: {error_msg}
+
+You MUST use the PGraphics mask approach for text. Copy this EXACT sequence:
+    letterMask = createGraphics(1080, 1080);
+    letterMask.beginDraw();
+    letterMask.background(0);
+    letterMask.fill(255);
+    letterMask.textAlign(CENTER, CENTER);
+    letterMask.textSize(200);
+    letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
+    letterMask.endDraw();
+
+Here is the previous code:
+{code}
+
+Return ONLY the creative code between the markers:
+// YOUR CREATIVE CODE GOES HERE
+// END OF YOUR CREATIVE CODE
+"""
+        else:
+            return f"""
+The previous code had the following error: {error_msg}
+
+Please fix the error and ensure:
+1. All code is between the markers
+2. No setup() or draw() functions
+3. No direct background() calls
+4. No translate(width/2, height/2)
+5. Proper Processing syntax
+
+Here is the previous code:
+{code}
+
+Return ONLY the creative code between the markers:
+// YOUR CREATIVE CODE GOES HERE
+// END OF YOUR CREATIVE CODE
+""" 

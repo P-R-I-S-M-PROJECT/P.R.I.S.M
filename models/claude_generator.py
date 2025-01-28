@@ -171,7 +171,7 @@ Beyond these basics, you have complete creative freedom. Let your artistic visio
             self.log.debug(f"Selected model ID: {model_id if 'model_id' in locals() else 'not selected yet'}")
             return None
 
-    def _build_generation_prompt(self, techniques: str) -> str:
+    def _build_generation_prompt(self, techniques: str, custom_guidelines: str = "") -> str:
         """Build a focused creative prompt with clearer guidance"""
         # Get historical patterns to avoid repetition
         recent_patterns = self.config.db_manager.get_recent_patterns(limit=3)
@@ -183,6 +183,11 @@ Beyond these basics, you have complete creative freedom. Let your artistic visio
         motion_techniques = self._get_random_techniques_from_category('motion', 3)
         pattern_techniques = self._get_random_techniques_from_category('patterns', 3)
         
+        # Build creative direction with custom guidelines
+        creative_direction = f"""Consider exploring these techniques: {techniques}
+{f"Try something different than: {', '.join(avoid_patterns)}" if avoid_patterns else ""}
+{f"Custom Requirements: {custom_guidelines}" if custom_guidelines else ""}"""
+
         return f"""=== PROCESSING SKETCH GENERATOR ===
 Create a visually appealing animation that loops smoothly over 6 seconds.
 Let your creativity guide the direction - feel free to explore and experiment.
@@ -211,8 +216,7 @@ The system automatically handles these - DO NOT include them:
 • Use RGB values for colors (e.g., stroke(255, 0, 0) for red)
 
 === CREATIVE DIRECTION ===
-Consider exploring these techniques: {techniques}
-{f"Try something different than: {', '.join(avoid_patterns)}" if avoid_patterns else ""}
+{creative_direction}
 
 === TECHNIQUES & APPROACHES ===
 Form & Structure:
@@ -500,3 +504,19 @@ Return your code between these markers:
         except Exception as e:
             self.log.error(f"Error running sketch: {str(e)}")
             return False 
+
+    def generate_code(self, prompt_data: dict, custom_guidelines: str = None) -> Optional[str]:
+        """Generate code using the wizard prompt data"""
+        try:
+            # Build creative prompt from wizard data
+            techniques_str = ", ".join(prompt_data["techniques"])
+            
+            # Build the prompt using the _build_generation_prompt method
+            prompt = self._build_generation_prompt(techniques_str, custom_guidelines)
+            
+            # Generate code using the creative prompt
+            return self.generate_with_ai(prompt)
+            
+        except Exception as e:
+            self.log.error(f"Error in code generation: {str(e)}")
+            return None 

@@ -294,6 +294,10 @@ class ProcessingGenerator:
             code = code.encode('ascii', 'ignore').decode()  # Remove non-ASCII chars
             code = re.sub(r'[^\x00-\x7F]+', '', code)  # Additional non-ASCII cleanup
             
+            # Fix common letterMask issues
+            code = re.sub(r'letterMask\.letterMask', 'letterMask', code)  # Fix double reference
+            code = re.sub(r'letterMask\s*\.\s*letterMask', 'letterMask', code)  # Fix with spaces
+            
             # Extract just the user's creative code
             user_code = self._extract_user_code(code)
             if not user_code:
@@ -474,7 +478,7 @@ void draw() {{
                 "version": render_path.name.replace("render_v", ""),
                 "techniques": [t.name for t in self._current_techniques],
                 "timestamp": int(time.time() * 1000),
-                "model": self._current_model,  # Use actual selected model
+                "model": self._current_model,
                 "parameters": {
                     "complexity": self._current_complexity,
                     "innovation": self._current_innovation
@@ -489,7 +493,16 @@ void draw() {{
             # Convert metadata to JSON string
             metadata_json = json.dumps(metadata, ensure_ascii=False)
             
-            # Run PowerShell with metadata and correct sketch name
+            # Print final PDE code before running
+            if self.config.debug_mode:
+                template_path = self.config.paths['template']
+                with open(template_path, 'r') as f:
+                    final_code = f.read()
+                self.log.debug("\n=== FINAL PDE CODE TO BE RUN ===")
+                self.log.debug(final_code)
+                self.log.debug("=================================\n")
+            
+            # Run PowerShell with metadata and capture output
             result = subprocess.run(
                 [
                     "powershell.exe",
@@ -508,10 +521,41 @@ void draw() {{
                 timeout=360
             )
             
+            # Always log full Processing output in debug mode
+            if self.config.debug_mode:
+                self.log.debug("\n=== PROCESSING STDOUT ===")
+                self.log.debug(result.stdout)
+                self.log.debug("\n=== PROCESSING STDERR ===")
+                self.log.debug(result.stderr)
+                self.log.debug("========================\n")
+            
+            # Check for common Processing compilation errors
+            error_patterns = {
+                r"Cannot find symbol.*letterMask\.letterMask": "Double letterMask reference - use just letterMask instead",
+                r"cannot find symbol.*class PGraphics": "Missing PGraphics import or declaration",
+                r"cannot find symbol.*ArrayList": "Missing ArrayList import or declaration",
+                r"NullPointerException": "Null object reference - check initialization",
+                r"ArrayIndexOutOfBounds": "Array index out of bounds",
+                r"error: incompatible types:": "Type mismatch in variable assignment",
+                r"error: cannot find symbol": "Undefined variable or method",
+                r"error: ';' expected": "Missing semicolon",
+                r"the method (.*) is undefined": "Undefined method call",
+                r"error: reached end of file while parsing": "Missing closing brace or parenthesis"
+            }
+            
+            # Process output for better error messages
             if result.returncode != 0:
                 error_msg = result.stderr.strip() if result.stderr else result.stdout.strip()
+                
+                # Check for specific error patterns
+                for pattern, explanation in error_patterns.items():
+                    if re.search(pattern, error_msg, re.IGNORECASE):
+                        error_msg = f"{explanation}\nDetails: {error_msg}"
+                        break
+                
                 if not error_msg:
                     error_msg = "Unknown Processing execution error"
+                
                 self.log.error(f"Sketch execution failed: {error_msg}")
                 return False, error_msg
             
@@ -519,13 +563,19 @@ void draw() {{
             frames_path = self.config.base_path / "renders" / str(render_path)
             frame_files = list(frames_path.glob("frame-*.png"))
             if not frame_files:
+                # If no frames but also no error, check output for clues
+                if "Error:" in result.stdout or "error:" in result.stdout.lower():
+                    error_lines = [line for line in result.stdout.splitlines() if "error" in line.lower()]
+                    error_msg = "\n".join(error_lines)
+                else:
+                    error_msg = "No frames were generated and no error was reported. This might indicate a runtime error or infinite loop."
+                
                 self.log.error(f"No frame files found in {frames_path}")
-                return False, "No frames were generated"
+                return False, error_msg
             
             # Check for video generation success
             if "Video saved as:" in result.stdout:
                 self.log.success("Sketch execution and video generation successful")
-                self.log.info(result.stdout)
                 return True, None
             
             return True, None
@@ -538,6 +588,9 @@ void draw() {{
         except Exception as e:
             error_msg = f"Error running sketch: {str(e)}"
             self.log.error(error_msg)
+            if self.config.debug_mode:
+                import traceback
+                self.log.debug(traceback.format_exc())
             return False, error_msg
     
     def _get_random_techniques_from_category(self, category: str, count: int = 3) -> List[str]:

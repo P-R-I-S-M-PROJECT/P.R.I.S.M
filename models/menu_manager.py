@@ -270,4 +270,32 @@ class MenuManager:
             elif choice == "6":
                 break
             else:
-                print("\nInvalid choice. Please try again.") 
+                print("\nInvalid choice. Please try again.")
+
+    def _build_creative_prompt(self, motion: str, shapes: str, colors: str, pattern: str, custom_guidelines: str = "") -> dict:
+        """Build the creative prompt from selected options"""
+        prompt = {
+            "techniques": self.selected_techniques,
+            "motion_style": motion,
+            "shape_elements": shapes,
+            "color_approach": colors,
+            "pattern_type": pattern,
+        }
+        
+        if custom_guidelines:
+            # Check if this is a text-based requirement
+            is_text_requirement = any(word in custom_guidelines.lower() for word in ['text', 'spell', 'word', 'letter'])
+            
+            if is_text_requirement:
+                # Enhance the guideline to be more specific about shape-based approach
+                enhanced_guideline = f"""Form text organically using the following approach:
+• Use {shapes.lower() if shapes else 'geometric patterns'} to construct letter shapes
+• Implement with PGraphics mask for precise boundaries
+• Text should emerge from {pattern.lower() if pattern else 'dynamic patterns'}
+• Animate smoothly with {motion.lower() if motion else 'fluid motion'}
+• Original requirement: {custom_guidelines}"""
+                prompt["custom_guidelines"] = enhanced_guideline
+            else:
+                prompt["custom_guidelines"] = custom_guidelines
+            
+        return prompt 
