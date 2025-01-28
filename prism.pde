@@ -1,68 +1,69 @@
 // === USER'S CREATIVE CODE ===
-class GridPoint {
-  float x;
-  float y;
-  
-  GridPoint(float x, float y) {
-    this.x = x;
-    this.y = y;
+class Spiro {
+  float R, r, p;
+
+  // Removed direct color assignment in favor of dynamic/animated colors
+  Spiro(float bigR, float smallR, float penOffset) {
+    R = bigR;
+    r = smallR;
+    p = penOffset;
+  }
+
+  void drawSpiro(float offset, int detail) {
+    // Use HSB for more "trippy" color transitions
+    colorMode(HSB, 360, 100, 100, 100);
+    noStroke();
+    rectMode(CENTER);
+
+    for (int i = 0; i < detail; i++) {
+      float t = map(i, 0, detail, 0, TWO_PI * 4);
+      float x = (R - r) * cos(t + offset) + p * cos(((R - r) / r) * (t + offset));
+      float y = (R - r) * sin(t + offset) - p * sin(((R - r) / r) * (t + offset));
+
+      pushMatrix();
+      translate(x, y);
+      rotate(t + offset);
+
+      // Dynamic hue based on angle
+      float hueVal = (degrees(t + offset) * 2) % 360;
+      // Vary square size for extra movement
+      float sqSize = 6 + 6 * sin((t + offset) * 3);
+
+      // Primary square
+      fill(hueVal, 100, 100, 80);
+      rect(0, 0, sqSize, sqSize);
+
+      // Secondary "square influence" rotated for a trippier effect
+      rotate(PI / 4);
+      fill((hueVal + 180) % 360, 100, 100, 60);
+      rect(0, 0, sqSize * 0.7, sqSize * 0.7);
+
+      popMatrix();
+    }
   }
 }
 
-GridPoint[][] grid;
-float gridSpacing = 60;
-int cols, rows;
+// Global variables
+Spiro[] spiros;
 
 void initSketch() {
-  cols = int(width / gridSpacing) + 1;
-  rows = int(height / gridSpacing) + 1;
-  grid = new GridPoint[cols][rows];
-  
-  // Initialize grid points centered at (0,0)
-  for(int i = 0; i < cols; i++) {
-    for(int j = 0; j < rows; j++) {
-      float x = (i - cols/2) * gridSpacing;
-      float y = (j - rows/2) * gridSpacing;
-      grid[i][j] = new GridPoint(x, y);
-    }
-  }
+  // More varied parameters for extra complexity
+  spiros = new Spiro[4];
+  spiros[0] = new Spiro(200, 60, 20);
+  spiros[1] = new Spiro(250, 30, 80);
+  spiros[2] = new Spiro(180, 80, 40);
+  // An additional spiro for a fuller composition
+  spiros[3] = new Spiro(220, 40, 60);
 }
 
 void runSketch(float progress) {
+  // progress goes from 0.0 to 1.0 in a loop, mapping to one full rotation
   float angle = progress * TWO_PI;
-  float amplitude = 30;
-  
-  for(int i = 0; i < cols; i++) {
-    for(int j = 0; j < rows; j++) {
-      GridPoint p = grid[i][j];
-      
-      // Apply sinusoidal deformation for smooth looping
-      float displacedX = p.x + amplitude * sin(angle + p.y * 0.05);
-      float displacedY = p.y + amplitude * cos(angle + p.x * 0.05);
-      
-      // Calculate RGB color based on displaced positions
-      float r = map(displacedX, -width/2, width/2, 50, 255);
-      float g = map(displacedY, -height/2, height/2, 100, 255);
-      float b = 200 + 55 * sin(angle + p.x * 0.05);
-      stroke(constrain(r, 0, 255), constrain(g, 0, 255), constrain(b, 100, 255));
-      strokeWeight(2);
-      
-      // Draw lines to the right neighbor
-      if(i < cols - 1) {
-        GridPoint right = grid[i+1][j];
-        float displacedXR = right.x + amplitude * sin(angle + right.y * 0.05);
-        float displacedYR = right.y + amplitude * cos(angle + right.x * 0.05);
-        line(displacedX, displacedY, displacedXR, displacedYR);
-      }
-      
-      // Draw lines to the bottom neighbor
-      if(j < rows - 1) {
-        GridPoint bottom = grid[i][j+1];
-        float displacedXB = bottom.x + amplitude * sin(angle + bottom.y * 0.05);
-        float displacedYB = bottom.y + amplitude * cos(angle + bottom.x * 0.05);
-        line(displacedX, displacedY, displacedXB, displacedYB);
-      }
-    }
+
+  // Draw each spirograph with a slight offset variation
+  for (int i = 0; i < spiros.length; i++) {
+    float offset = angle * (1 + 0.3 * i);
+    spiros[i].drawSpiro(offset, 600);
   }
 }
 // END OF YOUR CREATIVE CODE
@@ -87,7 +88,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v3";
+        String renderPath = "renders/render_v2";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();

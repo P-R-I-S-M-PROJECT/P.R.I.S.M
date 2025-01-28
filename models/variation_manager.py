@@ -8,6 +8,8 @@ from logger import ArtLogger
 from config import Config
 from code_generator import ProcessingGenerator
 from models.flux import FluxGenerator
+import json
+import time
 
 class VariationManager:
     def __init__(self, config: Config, log: ArtLogger, generator: ProcessingGenerator, db):
@@ -16,6 +18,7 @@ class VariationManager:
         self.generator = generator
         self.db = db
         self.flux_generator = None
+        self.debug_mode = False  # Add debug mode tracking
 
     def show_variation_flow(self):
         """Show variation mode interface"""
@@ -38,15 +41,22 @@ class VariationManager:
         print("\nAvailable pieces:")
         for i, render in enumerate(renders, 1):
             version = str(render).split("_v")[-1]
-            png_files = list(render.glob("*.png"))
-            if png_files:
-                json_files = list(render.glob(f"image_v{version}*.json"))
-                if json_files:
-                    print(f"{i}. render_v{version} (Static)")
-                else:
-                    print(f"{i}. render_v{version} (Static)")
-            else:
+            
+            # Check for MP4 files first (dynamic)
+            mp4_files = list(render.glob("animation_*.mp4"))
+            if mp4_files:
                 print(f"{i}. render_v{version} (Dynamic)")
+            else:
+                # If no MP4, check for PNG files (static)
+                png_files = list(render.glob("*.png"))
+                if png_files:
+                    json_files = list(render.glob(f"image_v{version}*.json"))
+                    if json_files:
+                        print(f"{i}. render_v{version} (Static)")
+                    else:
+                        print(f"{i}. render_v{version} (Static - No Metadata)")
+                else:
+                    print(f"{i}. render_v{version} (Unknown Type)")
         
         print(f"{len(renders) + 1}. Back to Main Menu")
         
@@ -65,15 +75,21 @@ class VariationManager:
                     selected_render = renders[choice - 1]
                     version = str(selected_render).split("_v")[-1]
                     
-                    png_files = list(selected_render.glob("*.png"))
-                    if png_files:
-                        json_files = list(selected_render.glob(f"image_v{version}*.json"))
-                        if json_files:
-                            self._create_static_variation(json_files[0])
-                        else:
-                            self.log.error("Metadata file not found for static image")
-                    else:
+                    # Check for MP4 files first (dynamic)
+                    mp4_files = list(selected_render.glob("animation_*.mp4"))
+                    if mp4_files:
                         self._create_dynamic_variation(selected_render)
+                    else:
+                        # If no MP4, check for PNG files (static)
+                        png_files = list(selected_render.glob("*.png"))
+                        if png_files:
+                            json_files = list(selected_render.glob(f"image_v{version}*.json"))
+                            if json_files:
+                                self._create_static_variation(json_files[0])
+                            else:
+                                self.log.error("Metadata file not found for static image")
+                        else:
+                            self.log.error("Unknown render type - cannot create variation")
                     break
                 else:
                     print("Invalid choice")
@@ -81,7 +97,7 @@ class VariationManager:
                 print("Please enter a valid number")
             except Exception as e:
                 self.log.error(f"Error in variation flow: {e}")
-                if self.config.debug_mode:
+                if self.debug_mode:
                     import traceback
                     self.log.debug(traceback.format_exc())
                 break
@@ -96,7 +112,7 @@ class VariationManager:
             
         except Exception as e:
             self.log.error(f"Error creating static variation: {e}")
-            if self.config.debug_mode:
+            if self.debug_mode:
                 import traceback
                 self.log.debug(traceback.format_exc())
     
@@ -118,9 +134,11 @@ class VariationManager:
             with open(pde_file) as f:
                 original_code = f.read()
             
-            # Extract user code section
-            user_code_match = re.search(r"// === USER'S CREATIVE CODE ===\n(.*?)// END OF YOUR CREATIVE CODE", 
-                                      original_code, re.DOTALL)
+            # Extract user code section with more flexible regex
+            user_code_match = re.search(
+                r"(?s)// === USER'S CREATIVE CODE ===\s*(.*?)\s*// END OF YOUR CREATIVE CODE", 
+                original_code
+            )
             if not user_code_match:
                 self.log.error("Could not extract user code section")
                 return
@@ -148,188 +166,143 @@ class VariationManager:
                 self.log.info(f"\nCreating variation {i+1} of {num_variations}")
                 
                 modification = self._get_variation_modification()
+                max_retries = 3
+                success = False
                 
-                # Build prompt for code variation
-                system_prompt = f"""You are helping create a variation of an existing Processing sketch.
-Here is the original creative code:
-
-{user_code}
-
-The user wants these changes: {modification}
-
-Create a new version that maintains the core style and functionality,
-but incorporates the requested changes. Return only the code that goes
-between the USER'S CREATIVE CODE markers.
-
-Important guidelines:
-1. Keep the animation smooth and looping
-2. Maintain the use of the progress variable (0.0 to 1.0)
-3. Preserve any existing variables or functions unless directly modified
-4. Ensure all shapes are drawn relative to (0,0)
-5. Do not include any system functions (setup, draw, etc)"""
-
-                # Get new code from OpenAI
-                client = openai.OpenAI(api_key=self.config.openai_key)
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": "Generate the new code."}
-                    ],
-                    temperature=0.7
-                )
+                # Try to generate variation with retries
+                for retry in range(max_retries):
+                    if retry > 0:
+                        self.log.info(f"Retry attempt {retry} of {max_retries-1}")
+                    
+                    # Use O1's variation generation
+                    o1_generator = self.generator.o1_generator
+                    new_code = o1_generator.create_variation(user_code, modification, retry)
+                    
+                    if not new_code:
+                        self.log.error(f"Attempt {retry+1}: Failed to generate valid code. Retrying...")
+                        if retry < max_retries - 1:
+                            continue
+                        else:
+                            self.log.error("Failed to generate valid code after all attempts")
+                            break
+                    
+                    # Get next version and build template
+                    next_version = self.config.get_next_version()
+                    final_code = o1_generator.build_processing_template(new_code, next_version)
+                    
+                    # Save the code
+                    with open(self.config.paths['template'], 'w') as f:
+                        f.write(final_code)
+                    
+                    # Run the sketch
+                    render_path = f"renders/render_v{next_version}"
+                    success = self._run_sketch(render_path)
+                    
+                    if success:
+                        # Create pattern with parent reference
+                        new_pattern = Pattern(
+                            version=next_version,
+                            code=new_code,
+                            timestamp=datetime.now(),
+                            techniques=pattern.techniques if pattern else [],
+                            parent_patterns=[int(version)]  # Just keep the parent reference
+                        )
+                        
+                        # Score and save pattern
+                        scores = self.generator.score_pattern(new_pattern)
+                        new_pattern.update_scores(scores)
+                        self.db.save_pattern(new_pattern)
+                        
+                        # Update documentation
+                        self.generator.docs.update(new_pattern)
+                        
+                        self.log.success(f"Successfully created variation {i+1}")
+                        break  # Break retry loop on success
+                    else:
+                        self.log.error(f"Attempt {retry+1}: Failed to run variation. Retrying...")
+                        if retry < max_retries - 1:
+                            continue
                 
-                new_code = response.choices[0].message.content.strip()
-                
-                # Validate new code
-                success, error = self.generator.validate_creative_code(new_code)
                 if not success:
-                    self.log.error(f"Generated code validation failed: {error}")
-                    continue
-                
-                # Update template with new code
-                template = self.generator._build_template_with_config(self.config.get_next_version())
-                final_code = template.replace("// === USER'S CREATIVE CODE ===\n", 
-                                           f"// === USER'S CREATIVE CODE ===\n{new_code}\n")
-                
-                # Save and run new code
-                with open(self.config.paths['template'], 'w') as f:
-                    f.write(final_code)
-                
-                # Run the sketch
-                next_version = self.config.get_next_version()
-                render_path = f"renders/render_v{next_version}"
-                success = self._run_sketch(render_path)
-                
-                if success:
-                    # Create pattern with parent reference
-                    new_pattern = Pattern(
-                        version=next_version,
-                        code=new_code,
-                        timestamp=datetime.now(),
-                        techniques=pattern.techniques if pattern else [],
-                        parent_patterns=[int(version)],
-                        variation_type=f"Dynamic variation ({modification})"
-                    )
-                    
-                    # Score and save pattern
-                    scores = self.generator.score_pattern(new_pattern)
-                    new_pattern.update_scores(scores)
-                    self.db.save_pattern(new_pattern)
-                    
-                    # Update documentation
-                    self.docs.update(new_pattern)
-                    
-                    self.log.success(f"Successfully created variation {i+1}")
-                else:
-                    self.log.error(f"Failed to create variation {i+1}")
+                    self.log.error(f"Failed to create variation {i+1} after {max_retries} attempts")
             
         except Exception as e:
             self.log.error(f"Error creating dynamic variation: {e}")
-            if self.config.debug_mode:
+            if self.debug_mode:
                 import traceback
                 self.log.debug(traceback.format_exc())
 
     def _get_variation_modification(self):
         """Get user input for variation modification"""
         print("\n════════════════════════════════════════════════════════════════════════════════")
-        print("║ DYNAMIC VARIATION WIZARD")
+        print("║ VARIATION WIZARD")
         print("════════════════════════════════════════════════════════════════════════════════\n")
         
-        print("How would you like to modify the animation?")
-        print("1. Change motion pattern")
-        print("2. Modify shapes/geometry")
-        print("3. Adjust colors/style")
-        print("4. Change timing/speed")
-        print("5. Add new elements")
-        print("6. Custom modification")
+        options = {
+            1: ("Motion", [
+                "Make it move faster",
+                "Make it move slower",
+                "Add wave motion",
+                "Add spiral motion",
+                "Reverse the motion",
+                "Make it bounce"
+            ]),
+            2: ("Shapes", [
+                "Use squares instead",
+                "Use triangles instead",
+                "Use circles instead",
+                "Make shapes bigger",
+                "Make shapes smaller",
+                "Add more shapes"
+            ]),
+            3: ("Colors", [
+                "Make it black and white",
+                "Use rainbow colors",
+                "Use only blue shades",
+                "Use only red shades",
+                "Make it monochrome",
+                "Invert the colors"
+            ]),
+            4: ("Pattern", [
+                "Make it denser",
+                "Make it sparser",
+                "Add randomness",
+                "Make it symmetrical",
+                "Add rotation",
+                "Mirror the pattern"
+            ]),
+            5: ("Custom", None)
+        }
+        
+        print("Choose modification type:")
+        for num, (category, _) in options.items():
+            print(f"{num}. {category}")
         
         while True:
             try:
-                choice = int(input("\nEnter choice (1-6): "))
-                if 1 <= choice <= 6:
+                choice = int(input("\nEnter choice (1-5): "))
+                if 1 <= choice <= 5:
                     break
                 print("Invalid choice")
             except ValueError:
                 print("Please enter a number")
         
-        modification_options = {
-            1: {
-                "name": "motion pattern",
-                "options": [
-                    "Linear movement",
-                    "Circular motion", 
-                    "Wave patterns",
-                    "Random movement",
-                    "Spiral motion",
-                    "Oscillation"
-                ]
-            },
-            2: {
-                "name": "geometry",
-                "options": [
-                    "Circles",
-                    "Squares",
-                    "Triangles", 
-                    "Lines",
-                    "Custom polygons",
-                    "Mixed shapes"
-                ]
-            },
-            3: {
-                "name": "style",
-                "options": [
-                    "Monochrome",
-                    "Rainbow colors",
-                    "Complementary colors",
-                    "Grayscale", 
-                    "Custom color palette",
-                    "Color cycling"
-                ]
-            },
-            4: {
-                "name": "timing",
-                "options": [
-                    "Slower motion",
-                    "Faster motion",
-                    "Variable speed",
-                    "Reverse motion",
-                    "Pause points",
-                    "Custom timing"
-                ]
-            },
-            5: {
-                "name": "element",
-                "options": [
-                    "Particle effects",
-                    "Trail effects",
-                    "Background patterns",
-                    "Interactive elements",
-                    "Text elements",
-                    "Custom elements"
-                ]
-            }
-        }
+        if choice == 5:
+            # Custom modification
+            return input("\nEnter your custom modification instruction:\n> ")
         
-        if choice == 6:
-            print("\nEnter your custom modification instruction:")
-            return input("> ").strip()
+        # Show specific options for chosen category
+        category, suboptions = options[choice]
+        print(f"\nChoose {category.lower()} modification:")
+        for i, option in enumerate(suboptions, 1):
+            print(f"{i}. {option}")
         
-        options = modification_options[choice]
-        print(f"\nSelect new {options['name']}:")
-        for i, opt in enumerate(options['options'], 1):
-            print(f"{i}. {opt}")
-            
         while True:
             try:
-                subchoice = int(input(f"\nEnter choice (1-{len(options['options'])}): "))
-                if 1 <= subchoice <= len(options['options']):
-                    if choice == 5:
-                        return f"Add {options['options'][subchoice-1].lower()} to the animation"
-                    else:
-                        action = "Change" if choice != 4 else "Modify"
-                        target = "the animation timing to use" if choice == 4 else f"all shapes to" if choice == 2 else f"the {options['name']} to"
-                        return f"{action} {target} {options['options'][subchoice-1].lower()}"
+                subchoice = int(input(f"\nEnter choice (1-{len(suboptions)}): "))
+                if 1 <= subchoice <= len(suboptions):
+                    return suboptions[subchoice - 1]
+                print("Invalid choice")
             except ValueError:
                 print("Please enter a number")
 
@@ -337,14 +310,18 @@ Important guidelines:
         """Run the Processing sketch"""
         try:
             script_path = self.config.base_path / "scripts" / "run_sketches.ps1"
-            metadata_str = "{}"
+            metadata = {
+                "version": render_path.replace("render_v", ""),
+                "timestamp": int(time.time() * 1000),
+                "type": "variation"
+            }
+            metadata_str = json.dumps(metadata)
             
             # Run PowerShell script with parameters
             cmd = [
                 "powershell.exe",
                 "-ExecutionPolicy", "Bypass",
                 "-File", str(script_path),
-                "-SketchName", "prism",
                 "-RenderPath", str(render_path),
                 "-Metadata", metadata_str
             ]

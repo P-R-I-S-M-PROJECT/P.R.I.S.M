@@ -32,18 +32,21 @@ class OpenAIO1Generator:
         self.current_model = 'o1-mini'
         return self.model_ids['o1-mini']
     
-    def generate_with_ai(self, prompt: str) -> Optional[str]:
+    def generate_with_ai(self, prompt: str, skip_generation_prompt: bool = False, is_variation: bool = False) -> Optional[str]:
         """Generate code using OpenAI API with better error handling"""
         try:
-            # Build a focused creative prompt
-            structured_prompt = self._build_generation_prompt(prompt)
-            
-            # Add artistic context prefix
-            context = """You're a creative coder crafting generative art with Processing. 
+            if skip_generation_prompt:
+                full_prompt = prompt
+            else:
+                # Build a focused creative prompt
+                structured_prompt = self._build_generation_prompt(prompt)
+                
+                # Add artistic context prefix
+                context = """You're a creative coder crafting generative art with Processing. 
 Express your artistic vision through code - feel free to experiment and innovate.
 Just remember to use Processing's Java-style syntax as your medium."""
-            
-            full_prompt = context + "\n\n" + structured_prompt
+                
+                full_prompt = context + "\n\n" + structured_prompt
             
             # Log the full prompt being sent
             self.log.debug(f"\n=== SENDING TO AI ===\n{full_prompt}\n==================\n")
@@ -77,7 +80,7 @@ Just remember to use Processing's Java-style syntax as your medium."""
                 self.log.debug(f"Some metadata not available: {e}")
             self.log.debug("==================\n")
             
-            code = self._extract_code_from_response(raw_content)
+            code = self._extract_code_from_response(raw_content, is_variation)
             if not code:
                 self.log.debug("Failed to extract code from response")
                 return raw_content.strip()  # Return the raw content if no markers found
@@ -85,8 +88,8 @@ Just remember to use Processing's Java-style syntax as your medium."""
             # Log the extracted code
             self.log.debug(f"\n=== EXTRACTED CODE ===\n{code}\n==================\n")
             
-            # Validate creative code first
-            is_valid, error_msg = self.validate_creative_code(code)
+            # Validate creative code first, using is_variation to determine validation type
+            is_valid, error_msg = self.validate_creative_code(code, is_snippet=is_variation)
             if not is_valid:
                 self.log.debug(f"\n=== VALIDATION ERROR ===\nCreative validation failed: {error_msg}\n==================\n")
                 raise ValueError(f"Creative validation: {error_msg}")
@@ -193,7 +196,7 @@ Return your code between these markers:
         count = min(count, len(techniques))
         return random.sample(techniques, count)
 
-    def _clean_code(self, code: str) -> str:
+    def _clean_code(self, code: str, is_variation: bool = False) -> str:
         """Clean and prepare user code, ensuring proper structure"""
         try:
             # Remove any setup() or draw() functions
@@ -209,18 +212,16 @@ Return your code between these markers:
             code = re.sub(r'\s*saveFrame\([^)]*\);', '', code)
             code = re.sub(r'\s*exit\(\);', '', code)
             
-            # Ensure class definitions are at top level
-            code = re.sub(r'(class\s+\w+\s*{[^}]*})\s*void', r'\1\n\nvoid', code)
-            
             # Clean up empty lines and whitespace
             code = re.sub(r'\n\s*\n\s*\n', '\n\n', code)
             code = code.strip()
             
-            # Ensure required functions exist with proper structure
-            if 'void initSketch()' not in code:
-                code += '\n\nvoid initSketch() {\n  // Initialize sketch\n}'
-            if 'void runSketch(float progress)' not in code:
-                code += '\n\nvoid runSketch(float progress) {\n  // Update sketch\n}'
+            # Only add missing functions for non-variation code
+            if not is_variation:
+                if 'void initSketch()' not in code:
+                    code += '\n\nvoid initSketch() {\n  // Initialize sketch\n}'
+                if 'void runSketch(float progress)' not in code:
+                    code += '\n\nvoid runSketch(float progress) {\n  // Update sketch\n}'
             
             return code
             
@@ -228,7 +229,7 @@ Return your code between these markers:
             self.log.error(f"Error cleaning code: {e}")
             return code
 
-    def _extract_code_from_response(self, content: str) -> Optional[str]:
+    def _extract_code_from_response(self, content: str, is_variation: bool = False) -> Optional[str]:
         """Extract and clean user code from AI response without template wrapping"""
         try:
             # Clean special characters and ensure ASCII compatibility
@@ -247,7 +248,7 @@ Return your code between these markers:
             )
             
             # Clean and prepare code
-            return self._clean_code(code)
+            return self._clean_code(code, is_variation=is_variation)
             
         except Exception as e:
             self.log.error(f"Error extracting code: {str(e)}")
@@ -268,42 +269,28 @@ Return your code between these markers:
             self.log.error(f"Error extracting between markers: {e}")
             return code
 
-    def validate_creative_code(self, code: str) -> tuple[bool, str]:
-        """Validate creative code for forbidden elements, being more lenient with fixable issues"""
+    def validate_creative_code(self, code: str, is_snippet: bool = False) -> tuple[bool, str]:
+        """Validate creative code requirements.
+        
+        Args:
+            code: The code to validate
+            is_snippet: Whether this is a snippet for variation (vs full PDE)
+        """
         if not code.strip():
             return False, "Empty code"
-        
-        # Extract just the user's code portion
-        user_code = self._extract_between_markers(
-            code,
-            "// YOUR CREATIVE CODE GOES HERE",
-            "// END OF YOUR CREATIVE CODE"
-        )
-        
-        # Only check for critical system-level functions that would break the sketch
-        critical_forbidden = {
-            'setup(': 'Contains setup()',
-            'draw(': 'Contains draw()',
-            'background(': 'Contains background()',
-            'size(': 'Contains size()',
-            'frameRate(': 'Contains frameRate()',
-        }
-        
-        # Check for critical forbidden elements
-        for term, error in critical_forbidden.items():
-            if term in user_code:
-                return False, error
-        
-        # Check for absolute translations that would re-center the origin
-        for line in user_code.split('\n'):
-            line = line.strip()
-            if any(x in line for x in [
-                'translate(width/2', 'translate( width/2', 'translate(width / 2',
-                'translate(height/2', 'translate( height/2', 'translate(height / 2'
-            ]):
-                return False, "Contains origin re-centering - coordinates are already centered"
-        
-        return True, None
+
+        # For snippets (variations), only check for forbidden system functions
+        if is_snippet:
+            # Check for system functions that shouldn't be in snippets
+            forbidden = ['void setup()', 'void draw()', 'size(', 'frameRate(', 'saveFrame(']
+            for term in forbidden:
+                if term in code:
+                    return False, f"Snippet contains system function: {term}"
+            
+            return True, None
+            
+        # For full PDE generation, validate core requirements
+        return self.validate_core_requirements(code)
 
     def validate_core_requirements(self, code: str) -> tuple[bool, str]:
         """Validate only essential Processing code requirements, being more lenient"""
@@ -378,4 +365,84 @@ Return your code between these markers:
             self.log.error(f"Critical JavaScript syntax found:\n• {error_msg}")
             return False
         
-        return True 
+        return True
+
+    def create_variation(self, original_code: str, modification: str, retry_count: int = 0) -> Optional[str]:
+        """Create a variation of existing Processing code using O1 model."""
+        # Build simple, focused prompt
+        base_prompt = f"""Modify this Processing code according to the user's request.
+Keep the core animation logic but apply the changes.
+
+Original code:
+{original_code}
+
+Requested changes: {modification}
+
+Rules:
+- Keep the animation smooth and looping
+- Keep the progress variable (0.0 to 1.0)
+- Keep initSketch() and runSketch(progress) functions
+- Don't include setup() or draw()
+- Keep coordinates relative to (0,0)
+
+Return ONLY the modified code between these markers:
+// YOUR CREATIVE CODE GOES HERE
+// END OF YOUR CREATIVE CODE"""
+
+        # Add minimal retry context if needed
+        if retry_count > 0:
+            base_prompt += "\n\nPrevious attempt failed. Ensure code is between markers and uses Processing syntax."
+
+        # Generate variation
+        self._select_o1_model('o1')
+        # Pass is_variation=True to handle validation correctly
+        response = self.generate_with_ai(base_prompt, skip_generation_prompt=True, is_variation=True)
+        
+        # generate_with_ai already handles extraction, cleaning, and validation
+        return response
+
+    def build_processing_template(self, code: str, version: int) -> str:
+        """Build the complete Processing template with the given code.
+        
+        Args:
+            code: The creative code to insert
+            version: The version number for the render path
+            
+        Returns:
+            The complete Processing template with the code inserted
+        """
+        return f"""// === USER'S CREATIVE CODE ===
+{code}
+// END OF YOUR CREATIVE CODE
+
+// === SYSTEM FRAMEWORK ===
+void setup() {{
+    size(1080, 1080);
+    frameRate(60);
+    smooth();
+    initSketch();  // Initialize user's sketch
+}}
+
+final int totalFrames = 360;
+boolean hasError = false;
+
+void draw() {{
+    try {{
+        background(0);
+        stroke(255);  // Default stroke but can be changed
+        float progress = float(frameCount % totalFrames) / totalFrames;
+        translate(width/2, height/2);
+        
+        runSketch(progress);  // Run user's sketch with current progress
+        
+        String renderPath = "renders/render_v{version}";
+        saveFrame(renderPath + "/frame-####.png");
+        if (frameCount >= totalFrames) {{
+            exit();
+        }}
+    }} catch (Exception e) {{
+        println("Error in draw(): " + e.toString());
+        hasError = true;
+        exit();
+    }}
+}}"""  # Note: Added closing triple quote and removed trailing space 
