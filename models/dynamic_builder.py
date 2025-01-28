@@ -545,9 +545,21 @@ class DynamicBuilder:
             
             # Add retry logic for generation
             max_retries = 3
+            last_error = None
             for attempt in range(max_retries):
                 if attempt > 0:
                     self.log.info(f"Generation attempt {attempt+1}/{max_retries}")
+                    
+                    # If we have a last error, modify the prompt to address it
+                    if last_error:
+                        if "Missing ';'" in last_error:
+                            self.log.debug("Detected missing semicolon error, adding explicit instruction")
+                            if "custom_guidelines" in prompt_data:
+                                prompt_data["custom_guidelines"] = "IMPORTANT: Ensure all statements end with semicolons. " + prompt_data["custom_guidelines"]
+                        elif "letterMask" in last_error:
+                            self.log.debug("Detected letterMask error, adding explicit instruction")
+                            if "custom_guidelines" in prompt_data:
+                                prompt_data["custom_guidelines"] = "IMPORTANT: Follow exact letterMask initialization sequence. " + prompt_data["custom_guidelines"]
                 
                 # Randomly select new options for each attempt
                 if self.selected_illusions:
@@ -571,48 +583,59 @@ class DynamicBuilder:
                 # Get custom guidelines if they exist
                 custom_guidelines = prompt_data.get("custom_guidelines", None)
                 
-                # Generate the code
-                code = generator.generate_code(prompt_data, custom_guidelines=custom_guidelines)
+                try:
+                    # Generate the code with retry count and last error
+                    code = generator.generate_code(prompt_data, custom_guidelines=custom_guidelines, retry_count=attempt)
                     
-                if not code:
+                    if not code:
+                        if attempt < max_retries - 1:
+                            continue
+                        self.log.error("Failed to generate valid code")
+                        return None
+                    
+                    # Build the template
+                    final_code = generator.build_processing_template(code, next_version)
+                    
+                    # Save the code
+                    with open(self.config.paths['template'], 'w') as f:
+                        f.write(final_code)
+                    
+                    # Run the sketch
+                    render_path = f"render_v{next_version}"
+                    success = self._run_sketch(render_path)
+                    
+                    if success:
+                        # Create pattern object
+                        pattern = Pattern(
+                            version=next_version,
+                            code=code,
+                            timestamp=datetime.now(),
+                            techniques=self.selected_techniques
+                        )
+                        
+                        # Score and save pattern
+                        scores = self.generator.score_pattern(pattern)
+                        pattern.update_scores(scores)
+                        self.db.save_pattern(pattern)
+                        
+                        self.log.success(f"Successfully created dynamic artwork using {self.selected_model}")
+                        return pattern
+                    
                     if attempt < max_retries - 1:
                         continue
-                    self.log.error("Failed to generate valid code")
+                    
+                    self.log.error("Failed to run sketch")
                     return None
-                
-                # Build the template
-                final_code = generator.build_processing_template(code, next_version)
-                
-                # Save the code
-                with open(self.config.paths['template'], 'w') as f:
-                    f.write(final_code)
-                
-                # Run the sketch
-                render_path = f"render_v{next_version}"
-                success = self._run_sketch(render_path)
-                
-                if success:
-                    # Create pattern object
-                    pattern = Pattern(
-                        version=next_version,
-                        code=code,
-                        timestamp=datetime.now(),
-                        techniques=self.selected_techniques
-                    )
                     
-                    # Score and save pattern
-                    scores = self.generator.score_pattern(pattern)
-                    pattern.update_scores(scores)
-                    self.db.save_pattern(pattern)
-                    
-                    self.log.success(f"Successfully created dynamic artwork using {self.selected_model}")
-                    return pattern
-                
-                if attempt < max_retries - 1:
+                except Exception as e:
+                    last_error = str(e)
+                    self.log.error(f"Error in generation attempt {attempt+1}: {e}")
+                    if attempt == max_retries - 1:
+                        if self.config.debug_mode:
+                            import traceback
+                            self.log.debug(traceback.format_exc())
+                        return None
                     continue
-                
-                self.log.error("Failed to run sketch")
-                return None
             
             return None
             
@@ -887,12 +910,6 @@ class DynamicBuilder:
         
         # Step 5: Choose pattern type
         pattern_type = self._choose_pattern_type()
-        
-        # Get all wizard settings
-        self._choose_motion_style()
-        self._choose_shape_elements()
-        self._choose_color_approach()
-        self._choose_pattern_type()
         
         settings = {
             "model": self.selected_model,

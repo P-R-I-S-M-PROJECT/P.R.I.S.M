@@ -17,8 +17,26 @@ The system employs a sophisticated approach to artistic creation:
      - Guided wizard for step-by-step creation
      - Random mode for quick generation
    - Concise, focused prompts under 30 words
+   - Range-based selection system
+   - Multiple piece generation support
 
-2. **Variation System**
+2. **Specialized Art Systems**
+   - Text Art Generation:
+     - Particle-based text
+     - Pattern-filled text
+     - Emergent text forms
+     - Morphing text animations
+     - PGraphics mask system
+     - Organic pattern integration
+   - Optical Illusion Creation:
+     - Motion illusions
+     - Geometric illusions
+     - Color illusions
+     - Cognitive illusions
+     - Category combinations
+     - Effect customization
+
+3. **Variation System**
    - Dynamic and static artwork variations
    - Guided modification categories:
      - Motion adjustments
@@ -33,13 +51,17 @@ The system employs a sophisticated approach to artistic creation:
    - Technique consistency checks
    - Error recovery and retries
    - Real-time progress monitoring
+   - Support for text art variations
+   - Optical illusion modifications
 
-3. **Style Integration**
+4. **Style Integration**
    - Seamless element blending
    - Traditional-contemporary fusion
    - Cultural context awareness
    - Artistic domain mixing
    - Consistent style preservation
+   - Text-pattern harmony
+   - Illusion effect integration
 
 ## Interactive Studio Interface
 
@@ -50,11 +72,10 @@ The system provides an intuitive studio interface:
    - Multi-piece creative sessions
    - Continuous studio operation
    - Model selection for different artistic approaches
-   - Static artwork creation with:
-     - Step-by-step prompt wizard
-     - Random generation mode
-     - Concise prompt building
-     - Multiple variation support
+   - Range-based selection for all options
+   - Text art specialization
+   - Optical illusion focus
+   - Multiple generation support
 
 2. **Creative Models**
    - Adaptive model selection

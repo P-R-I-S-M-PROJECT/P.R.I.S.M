@@ -48,8 +48,12 @@ PRISM is an AI-powered creative studio agent that generates both dynamic animate
 - **🧬 Creative Evolution**: Self-improving system that learns from each creation
 - **📊 Deep Analysis**: Comprehensive evaluation of visual and technical elements
 - **📝 Studio Memory**: Maintains artistic lineage and creative development history
-- **🎲 Generation Modes**: Choose between guided wizard or random generation for static art
+- **🎲 Generation Modes**: Choose between guided wizard or random generation
 - **🔍 Focused Prompts**: Streamlined prompt generation with clear, concise results
+- **🎭 Text Art System**: Advanced text-based art with organic patterns and animations
+- **👁️ Optical Illusions**: Specialized illusion generation with multiple categories
+- **🔀 Multiple Generation**: Create multiple pieces with consistent settings
+- **🎯 Range Selection**: Enhanced selection system for all creative options
 
 ## 🎮 Interactive Studio Interface
 
@@ -123,6 +127,9 @@ Create evolving, animated artworks:
 - Multiple animation techniques
 - Frame-by-frame control
 - Export as video or GIF
+- Text-based art with organic animations
+- Optical illusion specialization
+- Multiple piece generation
 
 ### Creative Models
 - Random (Equal Representation)
@@ -140,6 +147,9 @@ PRISM's variation system allows deep exploration of artistic ideas:
 - Batch generation of variations with automatic validation
 - Preserve artistic lineage through parent-child relationships
 - Maintain technique consistency across variations
+- Support for text art variations
+- Optical illusion modifications
+- Range-based selection for all options
 
 ### Modification Categories
 1. **Motion**
@@ -227,6 +237,23 @@ PRISM's variation system allows deep exploration of artistic ideas:
 3. Test parameter ranges
 4. Save successful configurations
 5. Document technical settings
+6. Experiment with text art options
+7. Try different illusion categories
+8. Use range selection for variety
+
+### For Text Art
+1. Start with simple text
+2. Choose appropriate style (particle, pattern, emergent, morphing)
+3. Add motion and effects gradually
+4. Experiment with different patterns
+5. Use range selection for techniques
+
+### For Optical Illusions
+1. Select illusion categories
+2. Start with single effects
+3. Combine multiple categories
+4. Use range selection for variations
+5. Document successful combinations
 
 ### For Variations
 1. Start with successful pieces

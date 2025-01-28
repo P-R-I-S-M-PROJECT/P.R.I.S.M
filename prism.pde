@@ -1,88 +1,89 @@
 // === USER'S CREATIVE CODE ===
-// --------------------------------------------------------
-// 1) Define Classes at Top
-// --------------------------------------------------------
-class Dot {
-  float x;
-  float finalY;
-  float startY;
-  float radius;
-  float noiseOffset;
+// ----------------------------------------------------
+// 1) Define any classes at the top
+// ----------------------------------------------------
+class Agent {
+  float baseAngle;
+  float revolveSpeed;
+  float baseRadius;
+  float offset;
 
-  Dot(float x_, float y_) {
-    x = x_;
-    finalY = y_;
-    // Start each dot well below its final position for a vertical "rise" animation
-    startY = y_ + random(150, 400);
-    // Random radius for organic variation
-    radius = random(2, 5);
-    // Small random offset for subtle vertical wave
-    noiseOffset = random(1000);
+  Agent(float a, float rs, float br, float off) {
+    baseAngle = a;
+    revolveSpeed = rs;
+    baseRadius = br;
+    offset = off;
   }
 
-  void update(float progress) {
-    // Interpolate from startY to finalY
-    float yPos = lerp(startY, finalY, progress);
-    // Add slight vertical wave for optical flair
-    yPos += 10 * sin(noiseOffset + progress * TWO_PI * 2.0);
-
-    // Display this dot
-    display(x, yPos);
-  }
-
-  void display(float px, float py) {
-    noStroke();
-    // Monochromatic approach: white circles with some transparency
-    fill(255, 180);
-    ellipse(px, py, radius, radius);
+  PVector getPos(float t) {
+    // Position is determined by angle + time-driven rotation plus
+    // a subtle radial oscillation for dynamic movement
+    float angle = baseAngle + revolveSpeed * t;
+    float r = baseRadius + 50 * sin(t + offset);
+    return new PVector(cos(angle) * r, sin(angle) * r);
   }
 }
 
-// --------------------------------------------------------
-// 2) Declare Global Variables
-// --------------------------------------------------------
-PGraphics letterMask;
-ArrayList<Dot> dots = new ArrayList<Dot>();
+// ----------------------------------------------------
+// 2) Declare global variables
+// ----------------------------------------------------
+Agent[] agents;
+int numAgents = 36; // Number of agents in the circle
 
-// --------------------------------------------------------
-// 3) Define initSketch() for Setup
-// --------------------------------------------------------
+// ----------------------------------------------------
+// 3) initSketch() - Called once at start
+// ----------------------------------------------------
 void initSketch() {
-  // REQUIRED - Create Text Mask EXACTLY
-    PGraphics letterMask;
-  letterMask = createGraphics(1080, 1080);
-  letterMask.beginDraw();
-  letterMask.background(0);
-  letterMask.fill(255);
-  letterMask.textAlign(CENTER, CENTER);
-  letterMask.textSize(200);  // Adjust size as needed
-  letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
-  letterMask.endDraw();
-
-  // Create an ArrayList of dots inside the text mask
-  int totalDots = 2000;
-  int attempts = 0;
-
-  while (dots.size() < totalDots && attempts < totalDots * 50) {
-    float rx = random(-540, 540);
-    float ry = random(-540, 540);
-    // Check letterMask brightness
-    color c = letterMask.get(int(rx + 540), int(ry + 540));
-    if (brightness(c) > 0) {
-      dots.add(new Dot(rx, ry));
-    }
-    attempts++;
+  agents = new Agent[numAgents];
+  // Distribute agents around the center with random speeds and slight randomness
+  for (int i = 0; i < numAgents; i++) {
+    float angle = map(i, 0, numAgents, 0, TWO_PI);
+    float speed = random(2, 5);         // integer-ish rotation speeds for looping
+    float rad   = random(150, 250);     // base radius for each agent
+    float off   = random(TWO_PI);       // random offset for the radial oscillation
+    agents[i]   = new Agent(angle, speed, rad, off);
   }
 }
 
-// --------------------------------------------------------
-// 4) Define runSketch(progress) for Animation
-//    progress goes from 0.0 to 1.0
-// --------------------------------------------------------
+// ----------------------------------------------------
+// 4) runSketch(progress) - Called each frame
+//    progress goes from 0.0 to 1.0 over 6 seconds
+// ----------------------------------------------------
 void runSketch(float progress) {
-  // Animate and display each Dot
-  for (Dot d : dots) {
-    d.update(progress);
+  // Convert progress [0..1] to a full cycle [0..2PI]
+  float t = progress * TWO_PI;
+
+  // Set up drawing style
+  noFill();
+  strokeWeight(2);
+
+  // Chromatic aberration offsets and colors
+  PVector[] colorOffsets = {
+    new PVector(  2,   0 ),  // slight shift right
+    new PVector(  0,   2 ),  // slight shift down
+    new PVector( -2,  -2 ),  // diagonal shift
+    new PVector(  0,   0 )   // original position (white)
+  };
+  color[] colors = {
+    color(255,   0,   0),
+    color(  0, 255,   0),
+    color(  0,   0, 255),
+    color(255)          // white
+  };
+
+  // Draw four overlapping polygons with small positional shifts
+  // to produce the chromatic aberration illusion
+  for (int c = 0; c < 4; c++) {
+    stroke(colors[c]);
+    pushMatrix();
+    translate(colorOffsets[c].x, colorOffsets[c].y);
+    beginShape();
+    for (int i = 0; i < numAgents; i++) {
+      PVector pos = agents[i].getPos(t);
+      vertex(pos.x, pos.y);
+    }
+    endShape(CLOSE);
+    popMatrix();
   }
 }
 // END OF YOUR CREATIVE CODE
@@ -107,7 +108,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v1";
+        String renderPath = "renders/render_v4";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();
