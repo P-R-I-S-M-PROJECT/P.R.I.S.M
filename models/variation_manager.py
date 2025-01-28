@@ -150,7 +150,7 @@ class VariationManager:
             if pattern:
                 self.log.info(f"\nOriginal techniques: {', '.join(pattern.techniques)}")
             
-            # Get number of variations
+            # Get number of variations first
             while True:
                 try:
                     num_variations = input("\nHow many variations would you like to generate? (1-10): ").strip()
@@ -161,11 +161,12 @@ class VariationManager:
                 except ValueError:
                     print("Please enter a valid number")
             
-            # Generate variations
+            # Get single modification to apply to all variations
+            modification = self._get_variation_modification()
+            
+            # Generate variations using the same modification
             for i in range(num_variations):
                 self.log.info(f"\nCreating variation {i+1} of {num_variations}")
-                
-                modification = self._get_variation_modification()
                 max_retries = 3
                 success = False
                 
