@@ -78,7 +78,7 @@ class MenuManager:
                 if settings:
                     self.dynamic_builder.create_artwork(settings)
             elif choice == "2":
-                self._clean_studio()
+                self.prism.cleanup_system()
             elif choice == "3":
                 debug_enabled = self.config.toggle_debug_mode()
                 self.log.set_debug(debug_enabled)
