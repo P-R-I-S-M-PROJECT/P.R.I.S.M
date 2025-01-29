@@ -593,6 +593,12 @@ class DynamicBuilder:
                         self.log.error("Failed to generate valid code")
                         return None
                     
+                    # Add Processing-specific syntax validation
+                    if "java.util" in code or "lambda" in code:
+                        self.log.debug("Detected unsupported Java features, retrying with simpler code")
+                        if attempt < max_retries - 1:
+                            continue
+                    
                     # Build the template
                     final_code = generator.build_processing_template(code, next_version)
                     
@@ -610,7 +616,17 @@ class DynamicBuilder:
                             version=next_version,
                             code=code,
                             timestamp=datetime.now(),
-                            techniques=self.selected_techniques
+                            techniques=self.selected_techniques,
+                            model=self.selected_model,
+                            parameters={
+                                "complexity": self.current_complexity,
+                                "innovation": self.current_innovation
+                            },
+                            creative_approach={
+                                "geometry_techniques": self._get_random_techniques_from_category('geometry', 3),
+                                "motion_techniques": self._get_random_techniques_from_category('motion', 3),
+                                "pattern_techniques": self._get_random_techniques_from_category('patterns', 3)
+                            }
                         )
                         
                         # Score and save pattern
@@ -1015,4 +1031,17 @@ class DynamicBuilder:
             if custom_guidelines:
                 prompt_data["custom_guidelines"] = custom_guidelines
 
-        return prompt_data 
+        return prompt_data
+
+    def _get_random_techniques_from_category(self, category: str, count: int = 3) -> List[str]:
+        """Get a random selection of techniques from a category"""
+        if category not in self.config.technique_categories:
+            return []
+        
+        available_techniques = self.config.technique_categories[category]
+        if not available_techniques:
+            return []
+            
+        # Return random selection, but don't exceed available techniques
+        count = min(count, len(available_techniques))
+        return random.sample(available_techniques, count) 

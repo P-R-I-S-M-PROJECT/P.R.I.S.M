@@ -11,6 +11,9 @@ class Pattern:
     code: str
     timestamp: datetime
     techniques: List[str]
+    model: Optional[str] = None
+    parameters: Dict[str, float] = field(default_factory=dict)
+    creative_approach: Dict[str, List[str]] = field(default_factory=dict)
     score: float = 75.0
     innovation_score: float = 75.0
     aesthetic_score: float = 75.0

@@ -42,6 +42,8 @@ class DatabaseManager:
                     timestamp DATETIME NOT NULL,
                     techniques TEXT,
                     model TEXT DEFAULT 'o1-mini',
+                    parameters TEXT DEFAULT '{}',
+                    creative_approach TEXT DEFAULT '{}',
                     score REAL DEFAULT 75.0,
                     innovation_score REAL DEFAULT 75.0,
                     aesthetic_score REAL DEFAULT 75.0,
@@ -167,7 +169,8 @@ class DatabaseManager:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT version, code, timestamp, techniques, score,
+                SELECT version, code, timestamp, techniques, model,
+                       parameters, creative_approach, score,
                        innovation_score, aesthetic_score, mathematical_complexity,
                        motion_quality, visual_coherence, technique_synergy,
                        parent_patterns
@@ -181,14 +184,17 @@ class DatabaseManager:
                 code=row[1],
                 timestamp=datetime.fromisoformat(row[2]),
                 techniques=json.loads(row[3]) if row[3] else [],
-                score=row[4],
-                innovation_score=row[5],
-                aesthetic_score=row[6],
-                mathematical_complexity=row[7],
-                motion_quality=row[8],
-                visual_coherence=row[9],
-                technique_synergy=row[10],
-                parent_patterns=json.loads(row[11]) if row[11] else []
+                model=row[4],
+                parameters=json.loads(row[5]) if row[5] else {},
+                creative_approach=json.loads(row[6]) if row[6] else {},
+                score=row[7],
+                innovation_score=row[8],
+                aesthetic_score=row[9],
+                mathematical_complexity=row[10],
+                motion_quality=row[11],
+                visual_coherence=row[12],
+                technique_synergy=row[13],
+                parent_patterns=json.loads(row[14]) if row[14] else []
             ) for row in cursor.fetchall()]
         finally:
             conn.close()
@@ -274,16 +280,20 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO patterns (
-                    version, code, timestamp, techniques, score,
+                    version, code, timestamp, techniques, model,
+                    parameters, creative_approach, score,
                     innovation_score, aesthetic_score, mathematical_complexity,
                     motion_quality, visual_coherence, technique_synergy,
                     parent_patterns
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 pattern.version,
                 pattern.code,
                 pattern.timestamp.isoformat(),
                 json.dumps(pattern.techniques),
+                pattern.model,
+                json.dumps(pattern.parameters),
+                json.dumps(pattern.creative_approach),
                 pattern.score,
                 pattern.innovation_score,
                 pattern.aesthetic_score,
@@ -565,7 +575,8 @@ class DatabaseManager:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT version, code, timestamp, techniques, score,
+                SELECT version, code, timestamp, techniques, model,
+                       parameters, creative_approach, score,
                        innovation_score, aesthetic_score, mathematical_complexity,
                        motion_quality, visual_coherence, technique_synergy,
                        parent_patterns
@@ -582,14 +593,17 @@ class DatabaseManager:
                 code=row[1],
                 timestamp=datetime.fromisoformat(row[2]),
                 techniques=json.loads(row[3]) if row[3] else [],
-                score=row[4],
-                innovation_score=row[5],
-                aesthetic_score=row[6],
-                mathematical_complexity=row[7],
-                motion_quality=row[8],
-                visual_coherence=row[9],
-                technique_synergy=row[10],
-                parent_patterns=json.loads(row[11]) if row[11] else []
+                model=row[4],
+                parameters=json.loads(row[5]) if row[5] else {},
+                creative_approach=json.loads(row[6]) if row[6] else {},
+                score=row[7],
+                innovation_score=row[8],
+                aesthetic_score=row[9],
+                mathematical_complexity=row[10],
+                motion_quality=row[11],
+                visual_coherence=row[12],
+                technique_synergy=row[13],
+                parent_patterns=json.loads(row[14]) if row[14] else []
             )
         finally:
             conn.close()
