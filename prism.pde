@@ -1,77 +1,89 @@
 // === USER'S CREATIVE CODE ===
-// -----------------------------------------------------
-// 1) CLASSES
-// -----------------------------------------------------
-class Agent {
-  float baseAngle;   // Fixed angular position on the circle
-  float offset;      // Random phase offset for sin wave
-  float baseRadius;  // Base distance from center
-  float waveAmp;     // Magnitude of radial wave
+// ------------------------------------------------------
+// 1) Classes (if any); for this sketch, none needed
+// ------------------------------------------------------
 
-  Agent(float angle, float off, float bR, float wAmp) {
-    baseAngle   = angle;
-    offset      = off;
-    baseRadius  = bR;
-    waveAmp     = wAmp;
-  }
+// ------------------------------------------------------
+// 2) Global variables
+// ------------------------------------------------------
+color c1, c2;          // Two complementary base colors
+int gridCount = 13;    // Number of cells along each dimension
+float cellSize = 80;   // Distance between cell centers
 
-  // Return current position based on time t
-  PVector getPosition(float t) {
-    // Oscillate radius to create "breathing" effect
-    float r = baseRadius + waveAmp * sin(4.0 * t + offset);
-    float x = r * cos(baseAngle);
-    float y = r * sin(baseAngle);
-    return new PVector(x, y);
-  }
-}
-
-// -----------------------------------------------------
-// 2) GLOBAL VARIABLES
-// -----------------------------------------------------
-Agent[] agents;
-int numAgents = 200;
-
-// -----------------------------------------------------
-// 3) INIT SKETCH
-// -----------------------------------------------------
+// ------------------------------------------------------
+// 3) initSketch() - Called once at start
+// ------------------------------------------------------
 void initSketch() {
-  agents = new Agent[numAgents];
-  for (int i = 0; i < numAgents; i++) {
-    float angle = (TWO_PI * i) / numAgents;
-    float off   = random(TWO_PI);
-    // Construct each agent with a base angle, offset,
-    // a moderate radius, and a wave amplitude
-    agents[i] = new Agent(angle, off, 300, 80);
-  }
+  // Define complementary colors (e.g., pinkish and bluish)
+  c1 = color(255, 50, 80);
+  c2 = color(80, 200, 255);
 }
 
-// -----------------------------------------------------
-// 4) RUN SKETCH
-// -----------------------------------------------------
+// ------------------------------------------------------
+// 4) runSketch(progress) - Called every frame
+//    progress: 0.0 -> 1.0 over 6 seconds, loops smoothly
+// ------------------------------------------------------
 void runSketch(float progress) {
-  // "progress" goes from 0.0 to 1.0; map that to 0..TWO_PI
-  float t = progress * TWO_PI;
-
-  // Rotate the entire scene for a full revolution
-  pushMatrix();
-  rotate(t);
-
-  stroke(255);
-  noFill();
-  strokeWeight(2);
-
-  // Draw lines between agents to create patterned moir
-  for (int i = 0; i < numAgents; i++) {
-    PVector p1 = agents[i].getPosition(t);
-    // Connect to next agent
-    PVector p2 = agents[(i + 1) % numAgents].getPosition(t);
-    // Also connect to the "opposite" agent for extra complexity
-    PVector p3 = agents[(i + numAgents / 2) % numAgents].getPosition(t);
-
-    line(p1.x, p1.y, p2.x, p2.y);
-    line(p1.x, p1.y, p3.x, p3.y);
+  
+  // Overall angle to foster looping motion
+  float swirlAngle = progress * TWO_PI; // rotates full circle from 0..1
+  
+  // Use sine wave to modulate color blending over time
+  float colorFactor = 0.5 + 0.5 * sin(progress * TWO_PI);
+  color dynamicColor = lerpColor(c1, c2, colorFactor);
+  
+  // Loop over the grid
+  float offset = (gridCount - 1) * cellSize * 0.5; // for centering
+  for (int row = 0; row < gridCount; row++) {
+    for (int col = 0; col < gridCount; col++) {
+      
+      // Calculate base position
+      float x = col * cellSize - offset;
+      float y = row * cellSize - offset;
+      
+      // "Glitch" value from Perlin noise (smooth randomness)
+      // This value changes over time and across the grid
+      float n = noise(col * 0.3, row * 0.3, progress * 2.0);
+      // Map noise [0..1] to [-1..1]
+      float glitchVal = map(n, 0, 1, -1, 1);
+      
+      // Use glitchVal to create slight random translation & rotation
+      float transOffset = glitchVal * 8.0;         // random shift in position
+      float angleOffset = glitchVal * swirlAngle * 0.3; // random shift in rotation
+      
+      pushMatrix();
+      // Translate to cell center + glitch offset
+      translate(x + transOffset, y - transOffset);
+      // Apply a small rotation glitch
+      rotate(angleOffset);
+      
+      // Draw arcs in two opposing motion sets to create a strong motion illusion
+      noFill();
+      stroke(dynamicColor);
+      strokeWeight(2);
+      
+      // Adjust radius to fit each cell nicely
+      float r = cellSize * 0.6;
+      int arcCount = 8; // number of arcs per swirl set
+      
+      // First swirl set (rotates in sync with swirlAngle)
+      for (int i = 0; i < arcCount; i++) {
+        float startA = swirlAngle + i * (TWO_PI / arcCount) * 0.5;
+        float endA   = startA + (TWO_PI / arcCount) * 0.5;
+        arc(0, 0, r, r, startA, endA);
+      }
+      
+      // Second swirl set (opposite direction)
+      stroke(lerpColor(c2, c1, colorFactor)); // invert the color blend
+      for (int j = 0; j < arcCount; j++) {
+        float startB = -swirlAngle + j * (TWO_PI / arcCount) * 0.5;
+        float endB   = startB + (TWO_PI / arcCount) * 0.5;
+        arc(0, 0, r * 0.9, r * 0.9, startB, endB);
+      }
+      
+      popMatrix();
+    }
   }
-  popMatrix();
 }
 // END OF YOUR CREATIVE CODE
 
@@ -95,7 +107,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v3";
+        String renderPath = "renders/render_v13";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();

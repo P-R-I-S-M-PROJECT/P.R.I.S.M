@@ -149,10 +149,10 @@ class OpenAIO1Generator:
         # Only get random techniques if none were provided
         additional_guidance = ""
         if not techniques:
-        geometry_techniques = self._get_random_techniques_from_category('geometry', 3)
-        motion_techniques = self._get_random_techniques_from_category('motion', 3)
-        pattern_techniques = self._get_random_techniques_from_category('patterns', 3)
-        
+            geometry_techniques = self._get_random_techniques_from_category('geometry', 3)
+            motion_techniques = self._get_random_techniques_from_category('motion', 3)
+            pattern_techniques = self._get_random_techniques_from_category('patterns', 3)
+            
             additional_guidance = f"""
 === SUGGESTED TECHNIQUES ===
 Form & Structure:

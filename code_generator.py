@@ -11,6 +11,7 @@ import json
 import time
 import random
 from models.flux import FluxGenerator
+from models.validation import CodeValidator
 
 class ProcessingGenerator:
     def __init__(self, config: Config, logger: ArtLogger = None):
@@ -30,8 +31,9 @@ class ProcessingGenerator:
         self.claude_generator = ClaudeGenerator(config, self.log)
         self.flux_generator = FluxGenerator(config, self.log)
         
-        # Initialize pattern analyzer
+        # Initialize pattern analyzer and validator
         self.analyzer = PatternAnalyzer(config, self.log)
+        self.validator = CodeValidator(logger=self.log)
         
         # Initialize current state tracking
         self._current_techniques = []
@@ -245,41 +247,18 @@ class ProcessingGenerator:
                 self.log.warning(f"Attempt {attempt + 1}: AI returned no code")
                 raise ValueError("Model returned no code")  # Convert to ValueError to trigger retry
             
-            # Validate creative code
-            is_valid, error_msg = self._validate_creative_code(raw_code)
+            # Use centralized validation with retry logic
+            is_valid, error, guidance = self.validator.validate_with_retry(raw_code, attempt)
             if not is_valid:
-                self.log.warning(f"Attempt {attempt + 1}: Creative code validation failed - {error_msg}")
-                raise ValueError(f"Creative validation: {error_msg}")
+                if guidance:
+                    self.log.debug(f"\n=== VALIDATION GUIDANCE ===\n{guidance}\n==================\n")
+                raise ValueError(error)
+                
+            return raw_code
             
-            # Clean and merge code
-            merged_code = self._clean_code(raw_code, version)
-            if not merged_code:
-                self.log.warning(f"Attempt {attempt + 1}: Code cleaning failed")
-                raise ValueError("Failed to clean and merge code")
-            
-            # Validate core requirements
-            core_valid, core_error = self._validate_core_requirements(merged_code)
-            if not core_valid:
-                self.log.warning(f"Attempt {attempt + 1}: Core validation failed - {core_error}")
-                raise ValueError(f"Core validation: {core_error}")
-            
-            self.log.success(f"Code generated successfully on attempt {attempt + 1}")
-            return merged_code
-            
-        except ValueError:
-            # Re-raise ValueError to trigger retry with error message
-            raise
         except Exception as e:
-            self.log.error(f"Unexpected error in generation attempt {attempt + 1}: {e}")
-            raise ValueError(f"Generation error: {e}")
-    
-    def _validate_creative_code(self, code: str) -> tuple[bool, str]:
-        """Validate creative code for forbidden elements"""
-        return self.ai_generators[self._current_model].validate_creative_code(code)
-    
-    def _validate_core_requirements(self, code: str) -> tuple[bool, str]:
-        """Validate only essential Processing code requirements"""
-        return self.ai_generators[self._current_model].validate_core_requirements(code)
+            self.log.error(f"Error in single generation attempt: {str(e)}")
+            return None
     
     # === Code Processing and Validation ===
     def _clean_code(self, code: str, version: int) -> str:
@@ -402,25 +381,22 @@ Please fix these issues and return the corrected code."""
     
     # === File Operations ===
     def _save_code(self, code: str, version: int) -> None:
-        """Save generated code to prism.pde"""
+        """Save generated code to file"""
         try:
-            # Update render path with version
-            code = self._update_render_path(code, version)
+            # Use validator to build complete template
+            full_code = self.validator.build_processing_template(code, version)
             
-            # Save to prism.pde
-            template_path = self.config.paths['template']
-            with open(template_path, 'w') as f:
-                f.write(code)
+            # Ensure renders directory exists
+            render_path = self.config.base_path / "renders" / f"render_v{version}"
+            render_path.mkdir(parents=True, exist_ok=True)
             
-            # Verify prism.pde was saved
-            if not template_path.exists():
-                self.log.error(f"Failed to save {template_path}")
-                return
-                
-            self.log.success(f"Saved code to {template_path}")
+            # Save the code file
+            code_file = render_path / "sketch.pde"
+            code_file.write_text(full_code)
             
         except Exception as e:
-            self.log.error(f"Failed to save code: {e}")
+            self.log.error(f"Error saving code: {str(e)}")
+            raise
     
     def _build_template_with_config(self, version: int) -> str:
         """Build Processing template with proper code structure"""
@@ -529,34 +505,12 @@ void draw() {{
                 self.log.debug(result.stderr)
                 self.log.debug("========================\n")
             
-            # Check for common Processing compilation errors
-            error_patterns = {
-                r"Cannot find symbol.*letterMask\.letterMask": "Double letterMask reference - use just letterMask instead",
-                r"cannot find symbol.*class PGraphics": "Missing PGraphics import or declaration",
-                r"cannot find symbol.*ArrayList": "Missing ArrayList import or declaration",
-                r"NullPointerException": "Null object reference - check initialization",
-                r"ArrayIndexOutOfBounds": "Array index out of bounds",
-                r"error: incompatible types:": "Type mismatch in variable assignment",
-                r"error: cannot find symbol": "Undefined variable or method",
-                r"error: ';' expected": "Missing semicolon",
-                r"the method (.*) is undefined": "Undefined method call",
-                r"error: reached end of file while parsing": "Missing closing brace or parenthesis"
-            }
-            
-            # Process output for better error messages
+            # Check for compilation errors using validator's error patterns
             if result.returncode != 0:
                 error_msg = result.stderr.strip() if result.stderr else result.stdout.strip()
-                
-                # Check for specific error patterns
-                for pattern, explanation in error_patterns.items():
-                    if re.search(pattern, error_msg, re.IGNORECASE):
-                        error_msg = f"{explanation}\nDetails: {error_msg}"
-                        break
-                
-                if not error_msg:
-                    error_msg = "Unknown Processing execution error"
-                
-                self.log.error(f"Sketch execution failed: {error_msg}")
+                guidance = self.validator.build_error_guidance(error_msg)
+                if guidance:
+                    self.log.debug(f"\n=== ERROR GUIDANCE ===\n{guidance}\n==================\n")
                 return False, error_msg
             
             # Check if frames were generated
