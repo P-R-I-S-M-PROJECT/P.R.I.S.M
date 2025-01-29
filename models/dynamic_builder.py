@@ -37,24 +37,40 @@ class DynamicBuilder:
         self.selected_colors = settings.get('colors', [])
         self.selected_patterns = settings.get('patterns', [])
         
-        # Build the creative prompt
-        prompt = self._build_creative_prompt(
-            motion_style=random.choice(self.selected_motion_styles) if self.selected_motion_styles else "",
-            shape_elements=random.choice(self.selected_shapes) if self.selected_shapes else "",
-            color_approach=random.choice(self.selected_colors) if self.selected_colors else "",
-            pattern_type=random.choice(self.selected_patterns) if self.selected_patterns else "",
-            custom_guidelines=settings.get('custom_guidelines', "")
-        )
+        # Get number of artworks to create
+        num_artworks = settings.get('num_artworks', 1)
         
-        # If this is text art, ensure text-specific settings are preserved
-        if "text" in settings.get('custom_guidelines', "").lower():
-            prompt["is_text_art"] = True
-            # Extract the text from the guidelines (assuming format like "Create text 'PRISM'")
-            text_match = re.search(r"text '([^']+)'", settings['custom_guidelines'])
-            if text_match:
-                prompt["text"] = text_match.group(1)
+        patterns = []
+        for i in range(num_artworks):
+            if num_artworks > 1:
+                self.log.info(f"\nCreating artwork {i+1} of {num_artworks}")
             
-        return self._generate_artwork(prompt)
+            # Build the creative prompt with randomly selected elements
+            prompt = self._build_creative_prompt(
+                motion_style=random.choice(self.selected_motion_styles) if self.selected_motion_styles else "",
+                shape_elements=random.choice(self.selected_shapes) if self.selected_shapes else "",
+                color_approach=random.choice(self.selected_colors) if self.selected_colors else "",
+                pattern_type=random.choice(self.selected_patterns) if self.selected_patterns else "",
+                custom_guidelines=settings.get('custom_guidelines', "")
+            )
+            
+            # If this is text art, ensure text-specific settings are preserved
+            if "text" in settings.get('custom_guidelines', "").lower():
+                prompt["is_text_art"] = True
+                # Extract the text from the guidelines (assuming format like "Create text 'PRISM'")
+                text_match = re.search(r"text '([^']+)'", settings['custom_guidelines'])
+                if text_match:
+                    prompt["text"] = text_match.group(1)
+            
+            # Generate the artwork
+            pattern = self._generate_artwork(prompt)
+            if pattern:
+                patterns.append(pattern)
+            else:
+                self.log.error(f"Failed to generate artwork {i+1}")
+        
+        # Return the last pattern for backward compatibility
+        return patterns[-1] if patterns else None
     
     def _build_creative_prompt(self, motion_style: str = "", shape_elements: str = "", color_approach: str = "", pattern_type: str = "", custom_guidelines: str = "") -> dict:
         """Build the creative prompt from selected options"""

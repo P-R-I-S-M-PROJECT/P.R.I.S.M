@@ -28,6 +28,23 @@ class CreationWizard:
         print(f"║ Using Model: {self.selected_model}")
         print("════════════════════════════════════════════════════════════════════════════════\n")
         
+        # Ask for number of artworks to create
+        num_artworks = 1
+        while True:
+            try:
+                print("\nHow many artworks would you like to create? (1-10)")
+                print("Press Enter for single artwork")
+                choice = input("> ").strip()
+                if not choice:
+                    break
+                num = int(choice)
+                if 1 <= num <= 10:
+                    num_artworks = num
+                    break
+                print("Please enter a number between 1 and 10")
+            except ValueError:
+                print("Please enter a valid number")
+        
         # Get creative mode and handle choices
         mode_choice = self.menu_manager._get_creative_mode()
         custom_guidelines = self._handle_creative_mode(mode_choice)
@@ -43,12 +60,17 @@ class CreationWizard:
         
         return {
             "model": self.selected_model,
+            "num_artworks": num_artworks,
             "techniques": self.selected_techniques,
             "motion_styles": self.selected_motion_styles,
             "shapes": self.selected_shapes,
             "colors": self.selected_colors,
             "patterns": self.selected_patterns,
-            "custom_guidelines": custom_guidelines
+            "custom_guidelines": custom_guidelines,
+            "motion_style": motion_style,
+            "shape_elements": shape_elements,
+            "color_approach": color_approach,
+            "pattern_type": pattern_type
         }
     
     def _handle_creative_mode(self, mode_choice: str) -> str:
@@ -115,14 +137,30 @@ class CreationWizard:
         print("4. Wave Patterns")
         pattern = input("Choose pattern type (1-4): ").strip()
         
+        # If no pattern selected, give minimal guidance and let AI be creative
+        if not pattern:
+            if self.selected_patterns:
+                pattern_type = random.choice(self.selected_patterns)
+                return self._add_additional_guidelines(f"Create a dynamic visual experience with a {pattern_type.lower()} approach")
+            return self._add_additional_guidelines("Create a dynamic visual experience")
+        
+        # Use the selected pattern type to inform the guidelines
         patterns = {
-            "1": "Create organic patterns using reaction-diffusion algorithms",
-            "2": "Generate evolving patterns using cellular automata rules",
-            "3": "Design dynamic flow fields that guide particle movement",
-            "4": "Create interference patterns using overlapping waves"
+            "1": "Create evolving patterns using reaction-diffusion systems with organic growth",
+            "2": "Generate dynamic patterns using cellular automata with emergent behavior",
+            "3": "Design flowing patterns using vector fields and particle movement",
+            "4": "Create dynamic patterns using wave interference and propagation"
         }
-        guidelines = patterns.get(pattern, patterns["1"])
-        return self._add_additional_guidelines(guidelines)
+        
+        # Get the base guideline for the selected pattern
+        base_guideline = patterns.get(pattern, "Create a dynamic visual experience")
+        
+        # Add emphasis on pattern type if specified
+        if self.selected_patterns:
+            pattern_type = random.choice(self.selected_patterns)
+            base_guideline += f", emphasizing a {pattern_type.lower()} approach"
+            
+        return self._add_additional_guidelines(base_guideline)
     
     def _handle_text_art(self) -> str:
         """Handle text art options"""
