@@ -534,3 +534,10 @@ class Config:
             score += category_score * weight
             
         return score
+
+    def toggle_debug_mode(self):
+        """Toggle debug mode"""
+        self.debug_mode = not self.debug_mode
+        status = "enabled" if self.debug_mode else "disabled"
+        print(f"\nDebug mode {status}")
+        return self.debug_mode

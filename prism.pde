@@ -1,175 +1,126 @@
 // === USER'S CREATIVE CODE ===
-// -------------------------------------------
-// 1) Classes for spring physics and particles
-// -------------------------------------------
-class GridNode {
-  PVector origin;     // Original "rest" position
-  PVector pos;        // Current position
-  PVector vel;        // Velocity
-  PVector acc;        // Acceleration
-  float mass;         // Mass of the node, used in spring physics
-  
-  GridNode(float x, float y) {
-    origin = new PVector(x, y);
-    pos    = new PVector(x, y);
-    vel    = new PVector();
-    acc    = new PVector();
-    mass   = 1.0;
+// -----------------------------------------------------
+// 1) Classes
+// -----------------------------------------------------
+class Particle {
+  float x, y;       // Current position
+  float vx, vy;     // Velocity
+  float ax, ay;     // Acceleration
+  float baseX, baseY;  // Unshifted grid position
+  float k = 0.1;    // Spring stiffness
+  float damping = 0.8; // Damping factor
+
+  Particle(float px, float py) {
+    baseX = px;
+    baseY = py;
+    x = px;
+    y = py;
+    vx = vy = 0;
   }
-  
-  void applyForce(PVector f) {
-    // F = m * a => a = F/m
-    acc.add(PVector.div(f, mass));
-  }
-  
-  void update() {
-    // Simple Euler integration
-    vel.add(acc);
-    pos.add(vel);
-    acc.mult(0);
-    // Dampen velocity slightly
-    vel.mult(0.98);
-  }
-  
-  void springToOrigin(float k) {
-    // Hooke's law: F = -k * displacement
-    PVector dir = PVector.sub(origin, pos);
-    dir.mult(k);
-    applyForce(dir);
+
+  // We only move vertically, so anchorX is constant
+  void update(float anchorY) {
+    // Spring force to anchor
+    float force = k * (anchorY - y);
+    ay = force;
+    vy += ay;
+    y += vy;
+    vy *= damping;
   }
 }
 
-// -------------------------------------------
-// 2) Global variables
-// -------------------------------------------
-GridNode[][] grid;
-int cols = 20;
-int rows = 20;
-float spacing = 40;  // Distance between grid points
-float springK = 0.02; // Spring constant
-PGraphics letterMask; // Provided from the stub
+// -----------------------------------------------------
+// 2) Global Variables
+// -----------------------------------------------------
+PGraphics letterMask;
+Particle[][] grid;
 
-// -------------------------------------------
-// 3) initSketch() for setup
-// -------------------------------------------
+// Increased number of columns/rows for more particles
+int cols = 100;
+int rows = 35;
+
+float spacingX;        
+float spacingY;        
+color c1, c2;          
+// Increased wave amplitude for more dramatic motion
+float waveAmp = 60;    
+
+// -----------------------------------------------------
+// 3) Initialize
+// -----------------------------------------------------
 void initSketch() {
-  // ----------------------------------------------------------------
-  // A) Override the letterMask text with non-English "PRISM" text
-  //    (Japanese "" meaning "PRISM" in English)
-  // ----------------------------------------------------------------
+  // Initialize mask for text "PRISM" (kept same size but you can adjust if desired)
   letterMask = createGraphics(1080, 1080);
   letterMask.beginDraw();
   letterMask.background(0);
   letterMask.fill(255);
   letterMask.textAlign(CENTER, CENTER);
   letterMask.textSize(200);
-  letterMask.text("", letterMask.width/2, letterMask.height/2);
+  letterMask.text("PRISM", letterMask.width/2, letterMask.height/2);
   letterMask.endDraw();
-  
-  // ----------------------------------------------------------------
-  // B) Create a grid of nodes for spring-physics
-  //    We'll center them around (0,0):
-  // ----------------------------------------------------------------
-  grid = new GridNode[cols][rows];
-  float startX = -(cols-1)*spacing*0.5;
-  float startY = -(rows-1)*spacing*0.5;
-  
-  for (int x = 0; x < cols; x++) {
-    for (int y = 0; y < rows; y++) {
-      float posX = startX + x * spacing;
-      float posY = startY + y * spacing;
-      grid[x][y] = new GridNode(posX, posY);
+
+  // Setup grid
+  spacingX = 1080.0/(cols - 1);
+  spacingY = 1080.0/(rows - 1);
+  grid = new Particle[cols][rows];
+
+  // Complementary color pair (kept, but feel free to experiment)
+  c1 = color(255, 130, 0);   // Orange
+  c2 = color(0, 200, 255);   // Teal
+
+  // Create particles
+  for(int i = 0; i < cols; i++) {
+    for(int j = 0; j < rows; j++) {
+      float px = -540 + i * spacingX;
+      float py = -540 + j * spacingY;
+      grid[i][j] = new Particle(px, py);
     }
   }
 }
 
-// -------------------------------------------
-// 4) runSketch(progress) for animation
-// -------------------------------------------
+// -----------------------------------------------------
+// 4) Animation Loop
+//    progress goes 0.0 -> 1.0 -> 0.0 in a 6-second loop
+// -----------------------------------------------------
 void runSketch(float progress) {
-  // progress in [0..1], looping over 6 seconds
-  // We'll create a fluid, organic motion with sine + noise forces
-  // Also, let's map progress to an angle for looping
-  float angle = progress * TWO_PI; // Ranges 0..2PI for a smooth loop
+  
+  // Light fade each frame to increase text visibility
+  noStroke();
+  fill(0, 30);
+  rectMode(CENTER);
+  rect(0, 0, 1080, 1080);
 
-  // Load the letterMask pixels for text-based masking
-  letterMask.loadPixels();
-  
-  // A) Update the grid nodes
-  for (int x = 0; x < cols; x++) {
-    for (int y = 0; y < rows; y++) {
-      GridNode node = grid[x][y];
-      
-      // Spring force pulling node back to origin
-      node.springToOrigin(springK);
-      
-      // Add an oscillating force to create fluid motion
-      float nx = 0.01 * (x + 50*progress); 
-      float ny = 0.01 * (y + 50*progress);
-      // Combine noise with a sine wave for more variation
-      float nForce = noise(nx, ny) - 0.5;
-      float sForce = sin(angle + (x+y)*0.2) * 0.05;
-      
-      // Combine both forces in a random direction
-      PVector extraForce = new PVector(nForce + sForce, -sForce + nForce);
-      node.applyForce(extraForce);
-      
-      // Update node positions
-      node.update();
-    }
-  }
-  
-  // B) Draw the grid connections within the text mask
-  strokeCap(ROUND);
-  for (int x = 0; x < cols-1; x++) {
-    for (int y = 0; y < rows-1; y++) {
-      // We'll link each node to the one at [x+1,y], [x,y+1] for a grid
-      GridNode n1 = grid[x][y];
-      GridNode n2 = grid[x+1][y];
-      GridNode n3 = grid[x][y+1];
-      
-      // For each line segment, we check midpoint inside letterMask
-      // We'll sample at the midpoint of the line (n1 -> n2, n1 -> n3)
-      
-      // Condition 1: Horizontal neighbor
-      float midXh = (n1.pos.x + n2.pos.x) * 0.5 + width/2;
-      float midYh = (n1.pos.y + n2.pos.y) * 0.5 + height/2;
-      boolean isInMaskH = false;
-      if (midXh >= 0 && midXh < width && midYh >= 0 && midYh < height) {
-        color cH = letterMask.pixels[(int)midYh * width + (int)midXh];
-        if (brightness(cH) > 127) {
-          isInMaskH = true;
-        }
-      }
-      if (isInMaskH) {
-        // Stroke variation: thickness depends on distance from original
-        float dist1 = PVector.dist(n1.pos, n1.origin);
-        float dist2 = PVector.dist(n2.pos, n2.origin);
-        float sw    = map(dist1+dist2, 0, 200, 1, 3);
-        float shade = map(dist1+dist2, 0, 200, 180, 255); // grayscale
-        stroke(shade);
-        strokeWeight(sw);
-        line(n1.pos.x, n1.pos.y, n2.pos.x, n2.pos.y);
-      }
-      
-      // Condition 2: Vertical neighbor
-      float midXv = (n1.pos.x + n3.pos.x) * 0.5 + width/2;
-      float midYv = (n1.pos.y + n3.pos.y) * 0.5 + height/2;
-      boolean isInMaskV = false;
-      if (midXv >= 0 && midXv < width && midYv >= 0 && midYv < height) {
-        color cV = letterMask.pixels[(int)midYv * width + (int)midXv];
-        if (brightness(cV) > 127) {
-          isInMaskV = true;
-        }
-      }
-      if (isInMaskV) {
-        float dist1 = PVector.dist(n1.pos, n1.origin);
-        float dist3 = PVector.dist(n3.pos, n3.origin);
-        float sw    = map(dist1+dist3, 0, 200, 1, 3);
-        float shade = map(dist1+dist3, 0, 200, 180, 255);
-        stroke(shade);
-        strokeWeight(sw);
-        line(n1.pos.x, n1.pos.y, n3.pos.x, n3.pos.y);
+  // A full cycle of sin() for a smooth loop
+  float angleOffset = TWO_PI * progress;
+
+  // Update/draw each particle
+  for(int i = 0; i < cols; i++) {
+    for(int j = 0; j < rows; j++) {
+      Particle p = grid[i][j];
+
+      // Traveling wave in vertical direction
+      float wave = waveAmp * sin(angleOffset + (float)i * 0.2);
+      float anchorY = p.baseY + wave;
+      p.update(anchorY);
+
+      // Convert to mask coordinates
+      int maskX = int(p.x + 540);
+      int maskY = int(p.y + 540);
+
+      // Safety check on bounds
+      if(maskX < 0 || maskX >= 1080 || maskY < 0 || maskY >= 1080) continue;
+
+      // If the pixel is lit, draw a smaller particle
+      float bright = brightness(letterMask.get(maskX, maskY));
+      if(bright > 20) {
+        // Horizontal gradient between c1 and c2
+        float t = map(p.x, -540, 540, 0, 1);
+        color col = lerpColor(c1, c2, constrain(t, 0, 1));
+
+        noStroke();
+        fill(col);
+        // Smaller elliptical particles
+        ellipse(p.x, p.y, 3, 3);
       }
     }
   }
@@ -196,7 +147,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v32";
+        String renderPath = "renders/render_v35";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();

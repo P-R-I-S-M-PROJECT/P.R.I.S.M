@@ -2,6 +2,7 @@ from logger import ArtLogger
 from config import Config
 from models.flux import FluxGenerator
 from models.dynamic_builder import DynamicBuilder
+from models.creation_wizard import CreationWizard
 
 class MenuManager:
     def __init__(self, config: Config, log: ArtLogger, prism_instance):
@@ -9,7 +10,14 @@ class MenuManager:
         self.log = log
         self.prism = prism_instance
         self.selected_model = None
-        self.dynamic_builder = None
+        # Initialize DynamicBuilder with required dependencies
+        self.dynamic_builder = DynamicBuilder(
+            config=self.config,
+            log=self.log,
+            generator=self.prism.generator,
+            db=self.prism.db,
+            menu_manager=self
+        )
         self.illusion_types = {
             "1": {
                 "name": "Motion Illusions",
@@ -50,28 +58,39 @@ class MenuManager:
         }
         
     def show_menu(self):
-        """Display interactive menu"""
+        """Show the main menu and handle user input"""
         while True:
-            self.log.title("PRISM GENERATION SYSTEM")
-            print("\nOptions:")
+            print("\n════════════════════════════════════════════════════════════════════════════════")
+            print("║ P.R.I.S.M. STUDIO")
+            print("════════════════════════════════════════════════════════════════════════════════\n")
             print("1. Create Art")
-            print("2. Studio Cleanup")
+            print("2. Clean Studio")
             print("3. Toggle Debug Mode")
             print("4. Variation Mode")
             print("5. Exit")
             
-            choice = input("\nEnter your choice (1-5): ")
+            choice = input("\nEnter your choice (1-5): ").strip()
             
             if choice == "1":
-                self.show_creation_flow()
+                # Initialize the creation wizard
+                wizard = CreationWizard(self.config, self.log, self)
+                settings = wizard.collect_settings()
+                if settings:
+                    self.dynamic_builder.create_artwork(settings)
             elif choice == "2":
-                self.prism.cleanup_system()
+                self._clean_studio()
             elif choice == "3":
-                self.prism.toggle_debug_mode()
+                debug_enabled = self.config.toggle_debug_mode()
+                self.log.set_debug(debug_enabled)
+                if hasattr(self.prism, 'generator'):
+                    self.prism.generator.log.set_debug(debug_enabled)
             elif choice == "4":
-                self.prism.variation_manager.show_variation_flow()
+                if hasattr(self.prism, 'variation_manager'):
+                    self.prism.variation_manager.show_variation_flow()
+                else:
+                    print("\nVariation manager not initialized")
             elif choice == "5":
-                self.log.title("Exiting Studio")
+                print("\nExiting P.R.I.S.M. Studio...")
                 break
             else:
                 print("\nInvalid choice. Please try again.")
@@ -132,14 +151,6 @@ class MenuManager:
             choice = input("\nEnter your choice (1-4): ")
             
             if choice == "1":  # Wizard Mode
-                if self.dynamic_builder is None:
-                    self.dynamic_builder = DynamicBuilder(
-                        self.config,
-                        self.log,
-                        self.prism.generator,
-                        self.prism.db,
-                        self
-                    )
                 self.show_wizard_mode_menu(current_model)
                 input("\nPress Enter to continue...")
             elif choice == "2":  # Automated Evolution
