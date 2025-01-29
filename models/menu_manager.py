@@ -10,6 +10,44 @@ class MenuManager:
         self.prism = prism_instance
         self.selected_model = None
         self.dynamic_builder = None
+        self.illusion_types = {
+            "1": {
+                "name": "Motion Illusions",
+                "options": [
+                    "Spinning Spiral (hypnotic rotation effect)",
+                    "Peripheral Drift (subtle motion in periphery)",
+                    "Motion Aftereffect (waterfall illusion)",
+                    "Rotating Snakes (illusory rotation)",
+                ]
+            },
+            "2": {
+                "name": "Geometric Illusions",
+                "options": [
+                    "Impossible Shapes (paradoxical structures)",
+                    "Cafe Wall (parallel lines appear sloped)",
+                    "Penrose Triangle (impossible triangle)",
+                    "Necker Cube (ambiguous perspective)",
+                ]
+            },
+            "3": {
+                "name": "Color Illusions",
+                "options": [
+                    "Simultaneous Contrast (color perception changes)",
+                    "Color Afterimage (complementary color effect)",
+                    "Chromatic Aberration (color splitting)",
+                    "Bezold Effect (color spreading)",
+                ]
+            },
+            "4": {
+                "name": "Cognitive Illusions",
+                "options": [
+                    "Ambiguous Figures (multiple interpretations)",
+                    "Hidden Patterns (emergent images)",
+                    "Gestalt Patterns (whole vs parts)",
+                    "Anamorphic Art (perspective-dependent)",
+                ]
+            }
+        }
         
     def show_menu(self):
         """Display interactive menu"""
@@ -107,7 +145,8 @@ class MenuManager:
                         self.config,
                         self.log,
                         self.prism.generator,
-                        self.prism.db
+                        self.prism.db,
+                        self
                     )
                 self.show_wizard_mode_menu(current_model)
                 input("\nPress Enter to continue...")
@@ -304,3 +343,98 @@ class MenuManager:
                 prompt["custom_guidelines"] = custom_guidelines
             
         return prompt 
+
+    def _parse_range_selection(self, selection: str, max_value: int) -> list:
+        """Parse a range selection string into a list of integers."""
+        if not selection.strip() or selection.lower() == "all":
+            return list(range(max_value))
+            
+        selected = set()
+        parts = selection.split(",")
+        
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+                
+            try:
+                if "-" in part:
+                    start, end = map(int, part.split("-"))
+                    if 1 <= start <= end <= max_value:
+                        selected.update(range(start-1, end))
+                else:
+                    num = int(part)
+                    if 1 <= num <= max_value:
+                        selected.add(num-1)
+            except ValueError:
+                continue
+                
+        return sorted(list(selected))
+
+    def _get_illusion_choices(self):
+        """Get user's illusion choices"""
+        print("\nOptical Illusion Categories:")
+        print("1. Motion Illusions (spinning, drifting effects)")
+        print("2. Geometric Illusions (impossible shapes)")
+        print("3. Color Illusions (contrast, afterimages)")
+        print("4. Cognitive Illusions (ambiguous figures)")
+        print("\nFormat: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
+        
+        illusion_type = input("\nChoose illusion categories: ").strip()
+        
+        if not illusion_type:
+            return None
+            
+        indices = self._parse_range_selection(illusion_type, 4)
+        if not indices:
+            return None
+            
+        # Convert 0-based indices to 1-based category numbers
+        categories = [str(i + 1) for i in indices]
+        selected_illusions = []
+        
+        for cat_num in categories:
+            if cat_num in self.illusion_types:
+                category = self.illusion_types[cat_num]
+                print(f"\n{category['name']} Options:")
+                for i, option in enumerate(category['options'], 1):
+                    print(f"{i}. {option}")
+                
+                specific_choice = input(f"\nChoose specific {category['name'].lower()} (same format as above): ").strip()
+                
+                if specific_choice:
+                    sub_indices = self._parse_range_selection(specific_choice, len(category['options']))
+                    if sub_indices:
+                        for idx in sub_indices:
+                            illusion = category['options'][idx].split(" (")[0]
+                            selected_illusions.append((category['name'], illusion))
+        
+        return selected_illusions, categories
+
+    def _get_creative_mode(self):
+        """Get creative mode choice from user"""
+        print("\nChoose Creative Mode:")
+        print("1. Particle Systems (physics-based animations)")
+        print("2. Geometric Transformations (shape morphing)")
+        print("3. Pattern Generation (recursive/emergent)")
+        print("4. Text Art (shape-based/organic)")
+        print("5. Optical Illusions & Visual Puzzles")
+        print("6. Custom Guidelines")
+        print("\nEnter choice (1-6) or press Enter to skip: ")
+        return input().strip()
+
+    def _get_custom_guidelines(self):
+        """Get custom guidelines from user"""
+        print("\nEnter your custom creative guidelines:")
+        return input().strip()
+
+    def _get_text_input(self):
+        """Get text input for text art"""
+        print("\nWhat text would you like to create? (e.g. 'PRISM', 'Hello', etc.)")
+        text = input().strip() or "PRISM"
+        
+        print("\nWould you like to add any additional instructions? (e.g. 'only vertical motion', 'use specific colors', etc.)")
+        print("Press Enter to skip")
+        extra = input("> ").strip()
+        
+        return text, extra if extra else None 

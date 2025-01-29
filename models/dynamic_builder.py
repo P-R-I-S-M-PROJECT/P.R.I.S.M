@@ -11,11 +11,12 @@ import time
 import re
 
 class DynamicBuilder:
-    def __init__(self, config: Config, log: ArtLogger, generator, db):
+    def __init__(self, config: Config, log: ArtLogger, generator, db, menu_manager):
         self.config = config
         self.log = log
         self.generator = generator
         self.db = db
+        self.menu_manager = menu_manager
         self.current_complexity = 0.7
         self.current_innovation = 0.5
         self.selected_techniques = []
@@ -30,26 +31,16 @@ class DynamicBuilder:
         """Guide user through creating a dynamic artwork"""
         if model_name:
             self.selected_model = model_name
-        else:
-            self._choose_model()
             
         print("\n════════════════════════════════════════════════════════════════════════════════")
         print("║ DYNAMIC ART WIZARD")
         print(f"║ Using Model: {self.selected_model}")
         print("════════════════════════════════════════════════════════════════════════════════\n")
         
-        # Get any custom guidelines first
-        print("\nChoose Creative Mode:")
-        print("1. Particle Systems (physics-based animations)")
-        print("2. Geometric Transformations (shape morphing)")
-        print("3. Pattern Generation (recursive/emergent)")
-        print("4. Text Art (shape-based/organic)")
-        print("5. Optical Illusions & Visual Puzzles")
-        print("6. Custom Guidelines")
-        print("\nEnter choice (1-6) or press Enter to skip: ")
-        mode_choice = input().strip()
-        
+        # Get creative mode and handle choices
+        mode_choice = self.menu_manager._get_creative_mode()
         custom_guidelines = ""
+        
         if mode_choice:
             if mode_choice == "1":  # Particle Systems
                 print("\nParticle System Options:")
@@ -67,6 +58,13 @@ class DynamicBuilder:
                 }
                 custom_guidelines = behaviors.get(behavior, behaviors["1"])
                 
+                # Ask for additional guidelines
+                print("\nWould you like to add any additional instructions? (e.g. specific colors, motion constraints, etc.)")
+                print("Press Enter to skip")
+                additional = input("> ").strip()
+                if additional:
+                    custom_guidelines += f". Additional Requirements: {additional}"
+            
             elif mode_choice == "2":  # Geometric Transformations
                 print("\nGeometric Options:")
                 print("1. Sacred Geometry")
@@ -83,6 +81,13 @@ class DynamicBuilder:
                 }
                 custom_guidelines = geometries.get(geometry, geometries["1"])
                 
+                # Ask for additional guidelines
+                print("\nWould you like to add any additional instructions? (e.g. specific colors, motion constraints, etc.)")
+                print("Press Enter to skip")
+                additional = input("> ").strip()
+                if additional:
+                    custom_guidelines += f". Additional Requirements: {additional}"
+            
             elif mode_choice == "3":  # Pattern Generation
                 print("\nPattern Options:")
                 print("1. Reaction Diffusion")
@@ -99,208 +104,61 @@ class DynamicBuilder:
                 }
                 custom_guidelines = patterns.get(pattern, patterns["1"])
                 
-            elif mode_choice == "4":  # Text Art
-                print("\nWhat text would you like to create? (e.g. 'PRISM', 'Hello', etc.)")
-                desired_text = input().strip() or "PRISM"  # Default to PRISM if empty
-                
-                # NEW: Ask for additional instructions
-                print("\nWould you like to add any additional instructions? (e.g. 'only vertical motion', 'use specific colors', etc.)")
+                # Ask for additional guidelines
+                print("\nWould you like to add any additional instructions? (e.g. specific colors, motion constraints, etc.)")
                 print("Press Enter to skip")
-                extra_instructions = input("> ").strip()
-                
-                print("\nText Art Options:")
-                print("1. Particle Text")
-                print("2. Pattern-Filled Text")
-                print("3. Emergent Text")
-                print("4. Morphing Text")
-                print("\nEnter choice (1-4) or press Enter to let AI choose: ")
-                text_style = input().strip()
-                
-                text_styles = {
-                    "1": f"Create text '{desired_text}' using dynamic particle systems that assemble and flow",
-                    "2": f"Create text '{desired_text}' filled with intricate patterns and motion",
-                    "3": f"Create text '{desired_text}' that emerges from underlying patterns",
-                    "4": f"Create text '{desired_text}' through transforming flowing shapes that morph"
-                }
-                custom_guidelines = text_styles.get(text_style, f"Create text '{desired_text}' through shape-based patterns and dynamic motion")
-                
-                # Append extra instructions if provided
+                additional = input("> ").strip()
+                if additional:
+                    custom_guidelines += f". Additional Requirements: {additional}"
+            
+            elif mode_choice == "4":  # Text Art
+                text, extra_instructions = self.menu_manager._get_text_input()
+                custom_guidelines = f"Create text '{text}' through shape-based patterns and dynamic motion"
                 if extra_instructions:
                     custom_guidelines += f". Additional Requirements: {extra_instructions}"
             
             elif mode_choice == "5":  # Optical Illusions
-                print("\nOptical Illusion Categories:")
-                print("1. Motion Illusions (spinning, drifting effects)")
-                print("2. Geometric Illusions (impossible shapes)")
-                print("3. Color Illusions (contrast, afterimages)")
-                print("4. Cognitive Illusions (ambiguous figures)")
-                print("\nFormat: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
-                
-                illusion_type = input("\nChoose illusion categories: ").strip()
-                
-                illusion_types = {
-                    "1": {
-                        "name": "Motion Illusions",
-                        "options": [
-                            "Spinning Spiral (hypnotic rotation effect)",
-                            "Peripheral Drift (subtle motion in periphery)",
-                            "Motion Aftereffect (waterfall illusion)",
-                            "Rotating Snakes (illusory rotation)",
-                        ]
-                    },
-                    "2": {
-                        "name": "Geometric Illusions",
-                        "options": [
-                            "Impossible Shapes (paradoxical structures)",
-                            "Cafe Wall (parallel lines appear sloped)",
-                            "Penrose Triangle (impossible triangle)",
-                            "Necker Cube (ambiguous perspective)",
-                        ]
-                    },
-                    "3": {
-                        "name": "Color Illusions",
-                        "options": [
-                            "Simultaneous Contrast (color perception changes)",
-                            "Color Afterimage (complementary color effect)",
-                            "Chromatic Aberration (color splitting)",
-                            "Bezold Effect (color spreading)",
-                        ]
-                    },
-                    "4": {
-                        "name": "Cognitive Illusions",
-                        "options": [
-                            "Ambiguous Figures (multiple interpretations)",
-                            "Hidden Patterns (emergent images)",
-                            "Gestalt Patterns (whole vs parts)",
-                            "Anamorphic Art (perspective-dependent)",
-                        ]
-                    }
-                }
-                
-                if illusion_type:
-                    indices = self._parse_range_selection(illusion_type, 4)
-                    if indices:
-                        # Convert 0-based indices to 1-based category numbers
-                        categories = [str(i + 1) for i in indices]
+                result = self.menu_manager._get_illusion_choices()
+                if result:
+                    self.selected_illusions, categories = result
+                    if self.selected_illusions:
+                        _, chosen_illusion = random.choice(self.selected_illusions)
+                        custom_guidelines = f"Create a dynamic optical illusion using the {chosen_illusion.lower()} technique. "
+                        custom_guidelines += "Focus on creating a strong visual effect that challenges perception. "
+                        custom_guidelines += "Ensure the illusion is clear and effective, with smooth transitions and proper timing for maximum impact."
                         
-                        # For each selected category, show its options and get specific choices
-                        selected_illusions = []
-                        for cat_num in categories:
-                            if cat_num in illusion_types:
-                                category = illusion_types[cat_num]
-                                print(f"\n{category['name']} Options:")
-                                for i, option in enumerate(category['options'], 1):
-                                    print(f"{i}. {option}")
-                                
-                                specific_choice = input(f"\nChoose specific {category['name'].lower()} (same format as above): ").strip()
-                                
-                                if specific_choice:
-                                    sub_indices = self._parse_range_selection(specific_choice, len(category['options']))
-                                    if sub_indices:
-                                        # Add all selected illusions from this category
-                                        for idx in sub_indices:
-                                            illusion = category['options'][idx].split(" (")[0]
-                                            self.selected_illusions.append((category['name'], illusion))
-                
-                        if self.selected_illusions:
-                            # Randomly select one illusion from all chosen ones for each piece
-                            cat_name, chosen_illusion = random.choice(self.selected_illusions)
-                            custom_guidelines = f"Create a dynamic optical illusion using the {chosen_illusion.lower()} technique. "
-                            custom_guidelines += "Focus on creating a strong visual effect that challenges perception. "
-                            custom_guidelines += "Ensure the illusion is clear and effective, with smooth transitions and proper timing for maximum impact."
-                        else:
-                            # If no specific illusions were chosen, use all selected categories
-                            cat_names = [illusion_types[c]['name'] for c in categories]
-                            custom_guidelines = f"Create a dynamic optical illusion combining elements from the following categories: {', '.join(cat_names)}. "
-                            custom_guidelines += "Choose the most effective techniques to create compelling visual effects. "
-                            custom_guidelines += "Focus on strong perceptual impact and smooth execution."
+                        # Ask for additional guidelines
+                        print("\nWould you like to add any additional instructions? (e.g. specific colors, motion constraints, etc.)")
+                        print("Press Enter to skip")
+                        additional = input("> ").strip()
+                        if additional:
+                            custom_guidelines += f". Additional Requirements: {additional}"
                     else:
-                        custom_guidelines = "Create a dynamic optical illusion using any suitable technique. "
-                        custom_guidelines += "Choose the most effective approach to create a compelling visual effect. "
+                        cat_names = [self.menu_manager.illusion_types[c]['name'] for c in categories]
+                        custom_guidelines = f"Create a dynamic optical illusion combining elements from the following categories: {', '.join(cat_names)}. "
+                        custom_guidelines += "Choose the most effective techniques to create compelling visual effects. "
                         custom_guidelines += "Focus on strong perceptual impact and smooth execution."
+                        
+                        # Ask for additional guidelines
+                        print("\nWould you like to add any additional instructions? (e.g. specific colors, motion constraints, etc.)")
+                        print("Press Enter to skip")
+                        additional = input("> ").strip()
+                        if additional:
+                            custom_guidelines += f". Additional Requirements: {additional}"
                 else:
                     custom_guidelines = "Create a dynamic optical illusion using any suitable technique. "
                     custom_guidelines += "Choose the most effective approach to create a compelling visual effect. "
                     custom_guidelines += "Focus on strong perceptual impact and smooth execution."
             
             elif mode_choice == "6":  # Custom Guidelines
-                print("\nEnter your custom creative guidelines:")
-                custom_guidelines = input().strip()
-        
-        # If they provided guidelines but want to skip wizard, ask if they want to skip
-        if custom_guidelines:
-            # Check if this is a text-based requirement
-            is_text_requirement = any(word in custom_guidelines.lower() for word in ['text', 'spell', 'word', 'letter'])
-            
-            if is_text_requirement:
-                print("\nNOTE: For text-based art, we'll use:")
-                print("• Shape-based letter formation (NO direct text() calls)")
-                print("• PGraphics masks for letter boundaries")
-                print("• Dynamic patterns that organically reveal text")
-            
-            print("\nWould you like to:")
-            print("1. Use guidelines with wizard (recommended)")
-            print("2. Use only guidelines (skip wizard)")
-            choice = input("\nEnter choice (1-2) or press Enter for option 1: ").strip()
-            
-            if choice == "2":
-                # Build prompt with just guidelines
-                prompt = self._build_creative_prompt(
-                    custom_guidelines=custom_guidelines
-                )
-                return self._generate_artwork(prompt)
-        
-        # Step 1: Choose base techniques
-        print("\nChoose base mathematical techniques")
-        print("---------------------------")
-        print("You can select specific techniques for each category, or press Enter to skip.")
-        print("Format: single number, list (1,2,3), range (1-3), 'all', or Enter to skip")
-        print("\nIf you skip all categories, the AI will intelligently select techniques based on:")
-        print("• Your custom guidelines and creative direction")
-        print("• Historical performance data")
-        print("• Technique synergy patterns")
-        print("• The chosen creative mode (static vs. dynamic)\n")
-        
-        categories = {
-            'geometry': self.config.technique_categories['geometry'],
-            'motion': self.config.technique_categories['motion'],
-            'patterns': self.config.technique_categories['patterns']
-        }
-            
-        for category, techniques in categories.items():
-            print(f"\n{category.title()} Techniques:")
-            for i, technique in enumerate(techniques, 1):
-                print(f"{i}. {technique}")
-            
-            choices = input(f"\nSelect {category} techniques: ").strip()
-            if choices:
-                indices = self._parse_range_selection(choices, len(techniques))
-                selected = [techniques[i] for i in indices]
-                self.selected_techniques.extend(selected)
-        
-        if self.selected_techniques:
-            print(f"\nSelected techniques: {', '.join(self.selected_techniques)}")
-        else:
-            print("\nNo specific techniques selected - AI will analyze your requirements and select optimal techniques")
-        
-        # Step 2: Choose motion style
-        motion_style = self._choose_motion_style()
-        
-        # Step 3: Choose shape elements
-        shape_elements = self._choose_shape_elements()
-            
-        # Step 4: Choose color approach
-        color_approach = self._choose_color_approach()
-        
-        # Step 5: Choose pattern type
-        pattern_type = self._choose_pattern_type()
+                custom_guidelines = self.menu_manager._get_custom_guidelines()
         
         # Build the creative prompt
         prompt = self._build_creative_prompt(
-            motion_style=motion_style,
-            shape_elements=shape_elements,
-            color_approach=color_approach,
-            pattern_type=pattern_type,
+            motion_style=self._choose_motion_style(),
+            shape_elements=self._choose_shape_elements(),
+            color_approach=self._choose_color_approach(),
+            pattern_type=self._choose_pattern_type(),
             custom_guidelines=custom_guidelines
         )
         
@@ -563,7 +421,7 @@ class DynamicBuilder:
                 
                 # Randomly select new options for each attempt
                 if self.selected_illusions:
-                    cat_name, chosen_illusion = random.choice(self.selected_illusions)
+                    _, chosen_illusion = random.choice(self.selected_illusions)
                     prompt_data["custom_guidelines"] = f"Create a dynamic optical illusion using the {chosen_illusion.lower()} technique. "
                     prompt_data["custom_guidelines"] += "Focus on creating a strong visual effect that challenges perception. "
                     prompt_data["custom_guidelines"] += "Ensure the illusion is clear and effective, with smooth transitions and proper timing for maximum impact."
@@ -737,6 +595,13 @@ class DynamicBuilder:
                     "4": "Morph between different geometric shapes smoothly"
                 }
                 custom_guidelines = geometries.get(geometry, geometries["1"])
+                
+                # Ask for additional guidelines
+                print("\nWould you like to add any additional instructions? (e.g. specific colors, motion constraints, etc.)")
+                print("Press Enter to skip")
+                additional = input("> ").strip()
+                if additional:
+                    custom_guidelines += f". Additional Requirements: {additional}"
             
             elif mode_choice == "3":  # Pattern Generation
                 print("\nPattern Options:")
@@ -753,6 +618,13 @@ class DynamicBuilder:
                     "4": "Create interference patterns using overlapping waves"
                 }
                 custom_guidelines = patterns.get(pattern, patterns["1"])
+                
+                # Ask for additional guidelines
+                print("\nWould you like to add any additional instructions? (e.g. specific colors, motion constraints, etc.)")
+                print("Press Enter to skip")
+                additional = input("> ").strip()
+                if additional:
+                    custom_guidelines += f". Additional Requirements: {additional}"
             
             elif mode_choice == "4":  # Text Art
                 print("\nWhat text would you like to create? (e.g. 'PRISM', 'Hello', etc.)")
@@ -839,7 +711,7 @@ class DynamicBuilder:
                         categories = [str(i + 1) for i in indices]
                         
                         # For each selected category, show its options and get specific choices
-                        selected_illusions = []
+                        self.selected_illusions = []
                         for cat_num in categories:
                             if cat_num in illusion_types:
                                 category = illusion_types[cat_num]
@@ -859,16 +731,30 @@ class DynamicBuilder:
                 
                         if self.selected_illusions:
                             # Randomly select one illusion from all chosen ones for each piece
-                            cat_name, chosen_illusion = random.choice(self.selected_illusions)
+                            _, chosen_illusion = random.choice(self.selected_illusions)
                             custom_guidelines = f"Create a dynamic optical illusion using the {chosen_illusion.lower()} technique. "
                             custom_guidelines += "Focus on creating a strong visual effect that challenges perception. "
                             custom_guidelines += "Ensure the illusion is clear and effective, with smooth transitions and proper timing for maximum impact."
+                            
+                            # Ask for additional guidelines
+                            print("\nWould you like to add any additional instructions? (e.g. specific colors, motion constraints, etc.)")
+                            print("Press Enter to skip")
+                            additional = input("> ").strip()
+                            if additional:
+                                custom_guidelines += f". Additional Requirements: {additional}"
                         else:
                             # If no specific illusions were chosen, use all selected categories
                             cat_names = [illusion_types[c]['name'] for c in categories]
                             custom_guidelines = f"Create a dynamic optical illusion combining elements from the following categories: {', '.join(cat_names)}. "
                             custom_guidelines += "Choose the most effective techniques to create compelling visual effects. "
                             custom_guidelines += "Focus on strong perceptual impact and smooth execution."
+                            
+                            # Ask for additional guidelines
+                            print("\nWould you like to add any additional instructions? (e.g. specific colors, motion constraints, etc.)")
+                            print("Press Enter to skip")
+                            additional = input("> ").strip()
+                            if additional:
+                                custom_guidelines += f". Additional Requirements: {additional}"
                     else:
                         custom_guidelines = "Create a dynamic optical illusion using any suitable technique. "
                         custom_guidelines += "Choose the most effective approach to create a compelling visual effect. "
@@ -962,76 +848,6 @@ class DynamicBuilder:
             )
             
         return self._generate_artwork(prompt)
-
-    def _get_custom_guidelines(self) -> str:
-        """Get custom guidelines from user for any creative mode"""
-        self.log.info("\nWould you like to add any custom instructions or requirements? (Enter to skip)")
-        self.log.info("Examples:")
-        self.log.info("- Create something that evokes feeling of 'endless scroll'")
-        self.log.info("- Make the animation feel like it's breathing")
-        self.log.info("- Use only curved lines, no straight edges")
-        
-        custom_guidelines = input("\nEnter custom instructions: ").strip()
-        return custom_guidelines if custom_guidelines else ""
-
-    def build_creative_prompt(self) -> dict:
-        """Build the creative prompt through user interaction"""
-        # Get creative mode first
-        mode = self._get_creative_mode()
-        prompt_data = {}
-        
-        if mode == "Custom Guidelines":
-            custom_guidelines = self._get_custom_guidelines()
-            if not custom_guidelines:
-                self.log.warning("No custom guidelines provided. Please provide some direction.")
-                return None
-            prompt_data["custom_guidelines"] = custom_guidelines
-            
-        elif mode == "Text Art":
-            text = self._get_text_input()
-            if not text:
-                self.log.warning("No text provided for text art.")
-                return None
-            prompt_data["is_text_art"] = True
-            prompt_data["text"] = text
-            
-        # For optical illusions, get categories
-        if mode == "Optical Illusions & Visual Puzzles":
-            categories = self._get_illusion_categories()
-            if categories:
-                prompt_data["illusion_categories"] = categories
-
-        # Get base techniques
-        techniques = self._get_techniques()
-        if not techniques:
-            self.log.warning("No techniques selected.")
-            return None
-        prompt_data["techniques"] = techniques
-
-        # Get creative direction
-        motion = self._get_motion_style()
-        shapes = self._get_shape_elements()
-        colors = self._get_color_approach()
-        pattern = self._get_pattern_type()
-
-        if not all([motion, shapes, colors, pattern]):
-            self.log.warning("Missing required creative direction elements.")
-            return None
-
-        prompt_data.update({
-            "motion_style": motion,
-            "shape_elements": shapes,
-            "color_approach": colors,
-            "pattern_type": pattern
-        })
-
-        # Always get custom guidelines after other selections
-        if "custom_guidelines" not in prompt_data:
-            custom_guidelines = self._get_custom_guidelines()
-            if custom_guidelines:
-                prompt_data["custom_guidelines"] = custom_guidelines
-
-        return prompt_data
 
     def _get_random_techniques_from_category(self, category: str, count: int = 3) -> List[str]:
         """Get a random selection of techniques from a category"""

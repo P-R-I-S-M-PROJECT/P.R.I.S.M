@@ -1,88 +1,92 @@
 // === USER'S CREATIVE CODE ===
-// ------------------------------------------------------
-// 1) Classes (if any); for this sketch, none needed
-// ------------------------------------------------------
-
-// ------------------------------------------------------
-// 2) Global variables
-// ------------------------------------------------------
-color c1, c2;          // Two complementary base colors
-int gridCount = 13;    // Number of cells along each dimension
-float cellSize = 80;   // Distance between cell centers
-
-// ------------------------------------------------------
-// 3) initSketch() - Called once at start
-// ------------------------------------------------------
-void initSketch() {
-  // Define complementary colors (e.g., pinkish and bluish)
-  c1 = color(255, 50, 80);
-  c2 = color(80, 200, 255);
+// -----------------------------------------------------
+// 1) Define any classes at the top
+// -----------------------------------------------------
+class Agent {
+  float baseAngle;   // Base angular position
+  float baseRadius;  // Base radial distance from center
+  float greyVal;     // Grayscale tone
+  
+  Agent(float angle, float radius) {
+    baseAngle = angle;
+    baseRadius = radius;
+    // Randomize each agent's grayscale for subtle variation
+    greyVal = random(80, 230);
+  }
+  
+  // Display this agent as a skewed triangle for the optical illusion
+  void display(float globalAngle, float skewFactor) {
+    // Evolve each agent's angle by adding the global angle
+    float angle = baseAngle + globalAngle;
+    
+    // Compute base position (circular layout)
+    float xPos = cos(angle) * baseRadius;
+    float yPos = sin(angle) * baseRadius;
+    
+    // Use grayscale stroke and a semi-transparent fill
+    stroke(greyVal);
+    fill(greyVal, 80);
+    
+    pushMatrix();
+      // Translate agent to its position
+      translate(xPos, yPos);
+      
+      // Apply skew/scale in Y to create an anamorphic distortion
+      scale(1, skewFactor);
+      
+      // Rotate the triangle so it faces outward from the circle
+      rotate(angle);
+      
+      // Draw a simple triangle
+      float triSize = 20;
+      triangle(-triSize/2, triSize/2, 
+                0,         -triSize/2, 
+                triSize/2, triSize/2);
+    popMatrix();
+  }
 }
 
-// ------------------------------------------------------
-// 4) runSketch(progress) - Called every frame
-//    progress: 0.0 -> 1.0 over 6 seconds, loops smoothly
-// ------------------------------------------------------
+// -----------------------------------------------------
+// 2) Declare global variables
+// -----------------------------------------------------
+Agent[] agents;       // Array of agents
+int numAgents = 60;   // How many agents form the ring
+float radius = 300;   // Base radius for placing agents
+
+// -----------------------------------------------------
+// 3) Define initSketch() for setup
+// -----------------------------------------------------
+void initSketch() {
+  agents = new Agent[numAgents];
+  
+  // Distribute agents evenly around a circle
+  for (int i = 0; i < numAgents; i++) {
+    float angle  = map(i, 0, numAgents, 0, TWO_PI);
+    float offset = random(-15, 15);  // Slight random radius offset
+    agents[i] = new Agent(angle, radius + offset);
+  }
+}
+
+// -----------------------------------------------------
+// 4) Define runSketch(progress) for animation
+// -----------------------------------------------------
 void runSketch(float progress) {
+  // Global rotation angle from 0..1 -> 0..TWO_PI
+  float globalAngle = progress * TWO_PI;
   
-  // Overall angle to foster looping motion
-  float swirlAngle = progress * TWO_PI; // rotates full circle from 0..1
+  // Create a smooth skew factor to distort shapes:
+  //   Skew from ~0.5..1.5 and back, ensuring a smooth loop
+  float skewFactor = 1.0 + 0.5 * sin(globalAngle * 2.0);
   
-  // Use sine wave to modulate color blending over time
-  float colorFactor = 0.5 + 0.5 * sin(progress * TWO_PI);
-  color dynamicColor = lerpColor(c1, c2, colorFactor);
+  // Use no harsh fill edges
+  noStroke();
   
-  // Loop over the grid
-  float offset = (gridCount - 1) * cellSize * 0.5; // for centering
-  for (int row = 0; row < gridCount; row++) {
-    for (int col = 0; col < gridCount; col++) {
-      
-      // Calculate base position
-      float x = col * cellSize - offset;
-      float y = row * cellSize - offset;
-      
-      // "Glitch" value from Perlin noise (smooth randomness)
-      // This value changes over time and across the grid
-      float n = noise(col * 0.3, row * 0.3, progress * 2.0);
-      // Map noise [0..1] to [-1..1]
-      float glitchVal = map(n, 0, 1, -1, 1);
-      
-      // Use glitchVal to create slight random translation & rotation
-      float transOffset = glitchVal * 8.0;         // random shift in position
-      float angleOffset = glitchVal * swirlAngle * 0.3; // random shift in rotation
-      
-      pushMatrix();
-      // Translate to cell center + glitch offset
-      translate(x + transOffset, y - transOffset);
-      // Apply a small rotation glitch
-      rotate(angleOffset);
-      
-      // Draw arcs in two opposing motion sets to create a strong motion illusion
-      noFill();
-      stroke(dynamicColor);
-      strokeWeight(2);
-      
-      // Adjust radius to fit each cell nicely
-      float r = cellSize * 0.6;
-      int arcCount = 8; // number of arcs per swirl set
-      
-      // First swirl set (rotates in sync with swirlAngle)
-      for (int i = 0; i < arcCount; i++) {
-        float startA = swirlAngle + i * (TWO_PI / arcCount) * 0.5;
-        float endA   = startA + (TWO_PI / arcCount) * 0.5;
-        arc(0, 0, r, r, startA, endA);
-      }
-      
-      // Second swirl set (opposite direction)
-      stroke(lerpColor(c2, c1, colorFactor)); // invert the color blend
-      for (int j = 0; j < arcCount; j++) {
-        float startB = -swirlAngle + j * (TWO_PI / arcCount) * 0.5;
-        float endB   = startB + (TWO_PI / arcCount) * 0.5;
-        arc(0, 0, r * 0.9, r * 0.9, startB, endB);
-      }
-      
-      popMatrix();
-    }
+  // Light outlines to accent geometry
+  strokeWeight(1.5);
+  
+  // Draw each agent with the current global angle and skew
+  for (Agent a : agents) {
+    a.display(globalAngle, skewFactor);
   }
 }
 // END OF YOUR CREATIVE CODE
@@ -107,7 +111,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v13";
+        String renderPath = "renders/render_v25";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();
