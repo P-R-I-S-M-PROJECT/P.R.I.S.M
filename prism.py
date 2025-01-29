@@ -11,7 +11,6 @@ from cleanup import SystemCleaner
 from datetime import datetime
 from database_manager import DatabaseManager
 from models import Pattern
-from tests import TestRunner
 from models.flux import FluxGenerator
 from models.variation_manager import VariationManager
 from models.menu_manager import MenuManager
@@ -42,7 +41,6 @@ class PRISM:
         self.docs = DocumentationManager(self.config, self.log)
         self.evolution = PatternEvolution(self.config, self.log)
         self.cleaner = SystemCleaner(self.config, self.log)
-        self.test_runner = TestRunner(self.config, self.generator, self.evolution, self.db)
         self.variation_manager = VariationManager(self.config, self.log, self.generator, self.db)
         self.menu_manager = MenuManager(self.config, self.log, self)
         
@@ -247,7 +245,6 @@ Top Technique Combinations:""")
         self.docs.log.set_debug(self.debug_mode)
         self.evolution.log.set_debug(self.debug_mode)
         self.cleaner.log.set_debug(self.debug_mode)
-        self.test_runner.log.set_debug(self.debug_mode)
         
         status = "enabled" if self.debug_mode else "disabled"
         self.log.info(f"Debug mode {status}")
