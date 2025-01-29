@@ -57,12 +57,10 @@ class MenuManager:
             print("1. Create Art")
             print("2. Studio Cleanup")
             print("3. Toggle Debug Mode")
-            print("4. Test O1 Models")
-            print("5. Test Claude Models")
-            print("6. Variation Mode")
-            print("7. Exit")
+            print("4. Variation Mode")
+            print("5. Exit")
             
-            choice = input("\nEnter your choice (1-7): ")
+            choice = input("\nEnter your choice (1-5): ")
             
             if choice == "1":
                 self.show_creation_flow()
@@ -71,12 +69,8 @@ class MenuManager:
             elif choice == "3":
                 self.prism.toggle_debug_mode()
             elif choice == "4":
-                self.prism.test_runner.test_o1_models()
-            elif choice == "5":
-                self.prism.test_runner.test_claude_models()
-            elif choice == "6":
                 self.prism.variation_manager.show_variation_flow()
-            elif choice == "7":
+            elif choice == "5":
                 self.log.title("Exiting Studio")
                 break
             else:
@@ -86,28 +80,26 @@ class MenuManager:
         """Show streamlined creation flow"""
         self.log.title("SELECT CREATIVE MODEL")
         print("\nAvailable Models:")
-        print("1. Random")
-        print("2. O1")
-        print("3. O1-mini")
-        print("4. 4O")
-        print("5. Claude 3.5 Sonnet")
-        print("6. Claude 3 Opus")
-        print("7. Flux (Static artwork)")
-        print("8. Back to Main Menu")
+        print("1. O1")
+        print("2. O1-mini")
+        print("3. 4O")
+        print("4. Claude 3.5 Sonnet")
+        print("5. Claude 3 Opus")
+        print("6. Flux (Static artwork)")
+        print("7. Back to Main Menu")
         
-        choice = input("\nEnter your choice (1-8): ")
+        choice = input("\nEnter your choice (1-7): ")
         
-        if choice == "8":
+        if choice == "7":
             return
             
         model_map = {
-            "1": "random",
-            "2": "o1",
-            "3": "o1-mini",
-            "4": "4o",
-            "5": "claude-3.5-sonnet",
-            "6": "claude-3-opus",
-            "7": "flux"
+            "1": "o1",
+            "2": "o1-mini",
+            "3": "4o",
+            "4": "claude-3.5-sonnet",
+            "5": "claude-3-opus",
+            "6": "flux"
         }
         
         if choice in model_map:

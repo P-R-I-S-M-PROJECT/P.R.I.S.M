@@ -38,14 +38,14 @@ class Config:
         self.model_config = {
             'available_models': ['o1', 'o1-mini', '4o', 'claude-3-opus', 'claude-3.5-sonnet', 'flux'],
             'default_model': '4o',
-            'model_selection': 'random',  # 'random' or specific model name
+            'model_selection': '4o',  # Default to 4o instead of random
             'model_weights': {
-                '4o': 0.167,
-                'o1': 0.167,
-                'o1-mini': 0.167,
-                'claude-3-opus': 0.167,   
-                'claude-3.5-sonnet': 0.167, 
-                'flux': 0.167  # Flux with internal variants
+                '4o': 0.2,
+                'o1': 0.2,
+                'o1-mini': 0.2,
+                'claude-3-opus': 0.2,   
+                'claude-3.5-sonnet': 0.1, 
+                'flux': 0.1  # Flux with internal variants
             }
         }
         
