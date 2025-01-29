@@ -1,92 +1,177 @@
 // === USER'S CREATIVE CODE ===
-// -----------------------------------------------------
-// 1) Define any classes at the top
-// -----------------------------------------------------
-class Agent {
-  float baseAngle;   // Base angular position
-  float baseRadius;  // Base radial distance from center
-  float greyVal;     // Grayscale tone
+// -------------------------------------------
+// 1) Classes for spring physics and particles
+// -------------------------------------------
+class GridNode {
+  PVector origin;     // Original "rest" position
+  PVector pos;        // Current position
+  PVector vel;        // Velocity
+  PVector acc;        // Acceleration
+  float mass;         // Mass of the node, used in spring physics
   
-  Agent(float angle, float radius) {
-    baseAngle = angle;
-    baseRadius = radius;
-    // Randomize each agent's grayscale for subtle variation
-    greyVal = random(80, 230);
+  GridNode(float x, float y) {
+    origin = new PVector(x, y);
+    pos    = new PVector(x, y);
+    vel    = new PVector();
+    acc    = new PVector();
+    mass   = 1.0;
   }
   
-  // Display this agent as a skewed triangle for the optical illusion
-  void display(float globalAngle, float skewFactor) {
-    // Evolve each agent's angle by adding the global angle
-    float angle = baseAngle + globalAngle;
-    
-    // Compute base position (circular layout)
-    float xPos = cos(angle) * baseRadius;
-    float yPos = sin(angle) * baseRadius;
-    
-    // Use grayscale stroke and a semi-transparent fill
-    stroke(greyVal);
-    fill(greyVal, 80);
-    
-    pushMatrix();
-      // Translate agent to its position
-      translate(xPos, yPos);
-      
-      // Apply skew/scale in Y to create an anamorphic distortion
-      scale(1, skewFactor);
-      
-      // Rotate the triangle so it faces outward from the circle
-      rotate(angle);
-      
-      // Draw a simple triangle
-      float triSize = 20;
-      triangle(-triSize/2, triSize/2, 
-                0,         -triSize/2, 
-                triSize/2, triSize/2);
-    popMatrix();
+  void applyForce(PVector f) {
+    // F = m * a => a = F/m
+    acc.add(PVector.div(f, mass));
+  }
+  
+  void update() {
+    // Simple Euler integration
+    vel.add(acc);
+    pos.add(vel);
+    acc.mult(0);
+    // Dampen velocity slightly
+    vel.mult(0.98);
+  }
+  
+  void springToOrigin(float k) {
+    // Hooke's law: F = -k * displacement
+    PVector dir = PVector.sub(origin, pos);
+    dir.mult(k);
+    applyForce(dir);
   }
 }
 
-// -----------------------------------------------------
-// 2) Declare global variables
-// -----------------------------------------------------
-Agent[] agents;       // Array of agents
-int numAgents = 60;   // How many agents form the ring
-float radius = 300;   // Base radius for placing agents
+// -------------------------------------------
+// 2) Global variables
+// -------------------------------------------
+GridNode[][] grid;
+int cols = 20;
+int rows = 20;
+float spacing = 40;  // Distance between grid points
+float springK = 0.02; // Spring constant
+PGraphics letterMask; // Provided from the stub
 
-// -----------------------------------------------------
-// 3) Define initSketch() for setup
-// -----------------------------------------------------
+// -------------------------------------------
+// 3) initSketch() for setup
+// -------------------------------------------
 void initSketch() {
-  agents = new Agent[numAgents];
+  // ----------------------------------------------------------------
+  // A) Override the letterMask text with non-English "PRISM" text
+  //    (Japanese "" meaning "PRISM" in English)
+  // ----------------------------------------------------------------
+  letterMask = createGraphics(1080, 1080);
+  letterMask.beginDraw();
+  letterMask.background(0);
+  letterMask.fill(255);
+  letterMask.textAlign(CENTER, CENTER);
+  letterMask.textSize(200);
+  letterMask.text("", letterMask.width/2, letterMask.height/2);
+  letterMask.endDraw();
   
-  // Distribute agents evenly around a circle
-  for (int i = 0; i < numAgents; i++) {
-    float angle  = map(i, 0, numAgents, 0, TWO_PI);
-    float offset = random(-15, 15);  // Slight random radius offset
-    agents[i] = new Agent(angle, radius + offset);
+  // ----------------------------------------------------------------
+  // B) Create a grid of nodes for spring-physics
+  //    We'll center them around (0,0):
+  // ----------------------------------------------------------------
+  grid = new GridNode[cols][rows];
+  float startX = -(cols-1)*spacing*0.5;
+  float startY = -(rows-1)*spacing*0.5;
+  
+  for (int x = 0; x < cols; x++) {
+    for (int y = 0; y < rows; y++) {
+      float posX = startX + x * spacing;
+      float posY = startY + y * spacing;
+      grid[x][y] = new GridNode(posX, posY);
+    }
   }
 }
 
-// -----------------------------------------------------
-// 4) Define runSketch(progress) for animation
-// -----------------------------------------------------
+// -------------------------------------------
+// 4) runSketch(progress) for animation
+// -------------------------------------------
 void runSketch(float progress) {
-  // Global rotation angle from 0..1 -> 0..TWO_PI
-  float globalAngle = progress * TWO_PI;
+  // progress in [0..1], looping over 6 seconds
+  // We'll create a fluid, organic motion with sine + noise forces
+  // Also, let's map progress to an angle for looping
+  float angle = progress * TWO_PI; // Ranges 0..2PI for a smooth loop
+
+  // Load the letterMask pixels for text-based masking
+  letterMask.loadPixels();
   
-  // Create a smooth skew factor to distort shapes:
-  //   Skew from ~0.5..1.5 and back, ensuring a smooth loop
-  float skewFactor = 1.0 + 0.5 * sin(globalAngle * 2.0);
+  // A) Update the grid nodes
+  for (int x = 0; x < cols; x++) {
+    for (int y = 0; y < rows; y++) {
+      GridNode node = grid[x][y];
+      
+      // Spring force pulling node back to origin
+      node.springToOrigin(springK);
+      
+      // Add an oscillating force to create fluid motion
+      float nx = 0.01 * (x + 50*progress); 
+      float ny = 0.01 * (y + 50*progress);
+      // Combine noise with a sine wave for more variation
+      float nForce = noise(nx, ny) - 0.5;
+      float sForce = sin(angle + (x+y)*0.2) * 0.05;
+      
+      // Combine both forces in a random direction
+      PVector extraForce = new PVector(nForce + sForce, -sForce + nForce);
+      node.applyForce(extraForce);
+      
+      // Update node positions
+      node.update();
+    }
+  }
   
-  // Use no harsh fill edges
-  noStroke();
-  
-  // Light outlines to accent geometry
-  strokeWeight(1.5);
-  
-  // Draw each agent with the current global angle and skew
-  for (Agent a : agents) {
-    a.display(globalAngle, skewFactor);
+  // B) Draw the grid connections within the text mask
+  strokeCap(ROUND);
+  for (int x = 0; x < cols-1; x++) {
+    for (int y = 0; y < rows-1; y++) {
+      // We'll link each node to the one at [x+1,y], [x,y+1] for a grid
+      GridNode n1 = grid[x][y];
+      GridNode n2 = grid[x+1][y];
+      GridNode n3 = grid[x][y+1];
+      
+      // For each line segment, we check midpoint inside letterMask
+      // We'll sample at the midpoint of the line (n1 -> n2, n1 -> n3)
+      
+      // Condition 1: Horizontal neighbor
+      float midXh = (n1.pos.x + n2.pos.x) * 0.5 + width/2;
+      float midYh = (n1.pos.y + n2.pos.y) * 0.5 + height/2;
+      boolean isInMaskH = false;
+      if (midXh >= 0 && midXh < width && midYh >= 0 && midYh < height) {
+        color cH = letterMask.pixels[(int)midYh * width + (int)midXh];
+        if (brightness(cH) > 127) {
+          isInMaskH = true;
+        }
+      }
+      if (isInMaskH) {
+        // Stroke variation: thickness depends on distance from original
+        float dist1 = PVector.dist(n1.pos, n1.origin);
+        float dist2 = PVector.dist(n2.pos, n2.origin);
+        float sw    = map(dist1+dist2, 0, 200, 1, 3);
+        float shade = map(dist1+dist2, 0, 200, 180, 255); // grayscale
+        stroke(shade);
+        strokeWeight(sw);
+        line(n1.pos.x, n1.pos.y, n2.pos.x, n2.pos.y);
+      }
+      
+      // Condition 2: Vertical neighbor
+      float midXv = (n1.pos.x + n3.pos.x) * 0.5 + width/2;
+      float midYv = (n1.pos.y + n3.pos.y) * 0.5 + height/2;
+      boolean isInMaskV = false;
+      if (midXv >= 0 && midXv < width && midYv >= 0 && midYv < height) {
+        color cV = letterMask.pixels[(int)midYv * width + (int)midXv];
+        if (brightness(cV) > 127) {
+          isInMaskV = true;
+        }
+      }
+      if (isInMaskV) {
+        float dist1 = PVector.dist(n1.pos, n1.origin);
+        float dist3 = PVector.dist(n3.pos, n3.origin);
+        float sw    = map(dist1+dist3, 0, 200, 1, 3);
+        float shade = map(dist1+dist3, 0, 200, 180, 255);
+        stroke(shade);
+        strokeWeight(sw);
+        line(n1.pos.x, n1.pos.y, n3.pos.x, n3.pos.y);
+      }
+    }
   }
 }
 // END OF YOUR CREATIVE CODE
@@ -111,7 +196,7 @@ void draw() {
         
         runSketch(progress);  // Run user's sketch with current progress
         
-        String renderPath = "renders/render_v25";
+        String renderPath = "renders/render_v32";
         saveFrame(renderPath + "/frame-####.png");
         if (frameCount >= totalFrames) {
             exit();

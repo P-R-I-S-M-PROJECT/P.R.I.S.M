@@ -422,9 +422,16 @@ class DynamicBuilder:
                 # Randomly select new options for each attempt
                 if self.selected_illusions:
                     _, chosen_illusion = random.choice(self.selected_illusions)
-                    prompt_data["custom_guidelines"] = f"Create a dynamic optical illusion using the {chosen_illusion.lower()} technique. "
-                    prompt_data["custom_guidelines"] += "Focus on creating a strong visual effect that challenges perception. "
-                    prompt_data["custom_guidelines"] += "Ensure the illusion is clear and effective, with smooth transitions and proper timing for maximum impact."
+                    illusion_guidelines = f"Create a dynamic optical illusion using the {chosen_illusion.lower()} technique. "
+                    illusion_guidelines += "Focus on creating a strong visual effect that challenges perception. "
+                    illusion_guidelines += "Ensure the illusion is clear and effective, with smooth transitions and proper timing for maximum impact."
+                    
+                    # Preserve existing custom guidelines if they exist
+                    existing_guidelines = prompt_data.get("custom_guidelines", "")
+                    if existing_guidelines:
+                        prompt_data["custom_guidelines"] = f"{existing_guidelines}. {illusion_guidelines}"
+                    else:
+                        prompt_data["custom_guidelines"] = illusion_guidelines
                 
                 if self.selected_motion_styles:
                     prompt_data["motion_style"] = random.choice(self.selected_motion_styles)
@@ -827,25 +834,30 @@ class DynamicBuilder:
         
     def create_with_settings(self, settings: dict) -> Optional[Pattern]:
         """Create artwork using stored settings"""
+        # Restore all saved settings
         self.selected_model = settings['model']
         self.selected_techniques = settings.get('techniques', [])
+        self.selected_motion_styles = settings.get('motion_styles', [])
+        self.selected_shapes = settings.get('shapes', [])
+        self.selected_colors = settings.get('colors', [])
+        self.selected_patterns = settings.get('patterns', [])
         
-        if settings.get('skip_wizard'):
-            prompt = self._build_creative_prompt(
-                motion_style="",
-                shape_elements="",
-                color_approach="",
-                pattern_type="",
-                custom_guidelines=settings['custom_guidelines']
-            )
-        else:
-            prompt = self._build_creative_prompt(
-                motion_style=settings.get('motion_style', ""),
-                shape_elements=settings.get('shape_elements', ""),
-                color_approach=settings.get('color_approach', ""),
-                pattern_type=settings.get('pattern_type', ""),
-                custom_guidelines=settings.get('custom_guidelines', "")
-            )
+        # Build the creative prompt
+        prompt = self._build_creative_prompt(
+            motion_style=random.choice(self.selected_motion_styles) if self.selected_motion_styles else "",
+            shape_elements=random.choice(self.selected_shapes) if self.selected_shapes else "",
+            color_approach=random.choice(self.selected_colors) if self.selected_colors else "",
+            pattern_type=random.choice(self.selected_patterns) if self.selected_patterns else "",
+            custom_guidelines=settings.get('custom_guidelines', "")
+        )
+        
+        # If this is text art, ensure text-specific settings are preserved
+        if "text" in settings.get('custom_guidelines', "").lower():
+            prompt["is_text_art"] = True
+            # Extract the text from the guidelines (assuming format like "Create text 'PRISM'")
+            text_match = re.search(r"text '([^']+)'", settings['custom_guidelines'])
+            if text_match:
+                prompt["text"] = text_match.group(1)
             
         return self._generate_artwork(prompt)
 

@@ -10,6 +10,7 @@ letterMask.beginDraw();
 letterMask.background(0);
 letterMask.fill(255);
 letterMask.textAlign(CENTER, CENTER);
+letterMask.textFont(createFont("Arial Unicode MS", 200));  // Support for non-English characters
 letterMask.textSize(200);  // Adjust size as needed
 letterMask.text("{text}", letterMask.width/2, letterMask.height/2);
 letterMask.endDraw();"""
@@ -77,6 +78,7 @@ letterMask.endDraw();"""
         r'letterMask\s*\.\s*background\s*\(\s*0\.?0?\s*\)',
         r'letterMask\s*\.\s*fill\s*\(\s*255\s*\)',
         r'letterMask\s*\.\s*textAlign\s*\(\s*CENTER\s*,\s*CENTER\s*\)',
+        r'letterMask\s*\.\s*textFont\s*\(\s*createFont\s*\(\s*["\']Arial Unicode MS["\']\s*,\s*\d+\s*\)\s*\)',  # Added font validation
         r'letterMask\s*\.\s*textSize\s*\(\s*\d+',
         r'letterMask\s*\.\s*text\s*\(',
         r'letterMask\s*\.\s*endDraw\s*\(\s*\)'
@@ -90,8 +92,19 @@ letterMask.endDraw();"""
         base_requirements = (
             f"=== TEXT ART OBJECTIVE ===\n"
             f"Create dynamic art using the text: {text}\n\n"
-            f"{self.TEXT_ART_GUIDELINES}\n"
         )
+
+        # Add non-English text support if requested
+        if custom_guidelines and "language other then english" in custom_guidelines.lower():
+            base_requirements += (
+                "=== NON-ENGLISH TEXT SUPPORT ===\n"
+                "• Use Arial Unicode MS font for proper character rendering\n"
+                "• Consider text layout and spacing for different writing systems\n"
+                "• Ensure proper character alignment and scaling\n"
+                "• Test with various font sizes for readability\n\n"
+            )
+
+        base_requirements += self.TEXT_ART_GUIDELINES
 
         if custom_guidelines:
             base_requirements += f"\n=== CUSTOM REQUIREMENTS ===\n{custom_guidelines}"
