@@ -122,7 +122,7 @@ class VariationManager:
             version = str(render_dir).split("_v")[-1]
             
             # Try to find original PDE file
-            pde_file = render_dir / f"prism_v{version}.pde"
+            pde_file = render_dir / f"render_v{version}.pde"
             if not pde_file.exists():
                 pde_file = self.config.base_path / "prism.pde"
             
