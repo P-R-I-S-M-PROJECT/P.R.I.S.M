@@ -74,7 +74,7 @@ void draw() {{
 
     # Critical validation patterns
     CRITICAL_VALIDATION_PATTERNS = {
-        r'\bsize\s*\(': 'Contains size() call - this is handled by the system',
+        r'(?<!\w)size\s*\(': 'Contains size() call - this is handled by the system',
         r'\bframeRate\s*\(': 'Contains frameRate() call - this is handled by the system',
         r'\bsaveFrame\s*\(': 'Contains saveFrame() call - this is handled by the system',
         r'\bexit\s*\(': 'Contains exit() call - this is handled by the system',

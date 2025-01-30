@@ -195,6 +195,7 @@ Consider exploring these techniques: {techniques}
 === RETURN FORMAT ===
 Return your code between these markers:
 // YOUR CREATIVE CODE GOES HERE
+[your code here]
 // END OF YOUR CREATIVE CODE"""
 
     def _get_avoid_patterns(self, recent_patterns, historical_techniques, max_avoid=5) -> List[str]:
@@ -250,6 +251,7 @@ Rules:
 
 Return ONLY the modified code between these markers:
 // YOUR CREATIVE CODE GOES HERE
+[your code here]
 // END OF YOUR CREATIVE CODE"""
 
         # Add minimal retry context if needed
@@ -316,6 +318,7 @@ The system automatically handles these - DO NOT include them:
 === RETURN FORMAT ===
 Return your code between these markers:
 // YOUR CREATIVE CODE GOES HERE
+[your code here]
 // END OF YOUR CREATIVE CODE"""
 
         # Use the standard generation pipeline with the wizard prompt
@@ -393,6 +396,7 @@ Return your code between these markers:
                 "=== RETURN FORMAT ===\n"
                 "Return your code between these markers:\n"
                 "// YOUR CREATIVE CODE GOES HERE\n"
+                "[your code here]\n"
                 "// END OF YOUR CREATIVE CODE"
             )
             
@@ -452,4 +456,5 @@ Return your code between these markers:
 
 Please fix the issues and return ONLY the corrected code between these markers:
 // YOUR CREATIVE CODE GOES HERE
+[your code here]
 // END OF YOUR CREATIVE CODE""" 

@@ -181,84 +181,132 @@ class ProcessingGenerator:
             }
     
     # === Core Generation Logic ===
-    def _attempt_code_generation(self, prompt: str, version: int, max_attempts: int = 3) -> str:
-        """Attempt to generate valid code with retries"""
-        last_code = None
-        last_error = None
-        original_prompt = prompt
-        
-        # Store the initially selected model
-        initial_model = self._current_model
-        
-        for attempt in range(max_attempts):
-            try:
-                self.log.debug(f"\n=== GENERATION ATTEMPT {attempt + 1} ===")
-                if last_error:
-                    self.log.debug(f"Previous error: {last_error}")
-                    
-                # Always use the initial model for consistency
-                generator = self.ai_generators[initial_model]
-                # Ensure the generator keeps using the same model
-                if hasattr(generator, '_select_o1_model'):
-                    generator._select_o1_model(initial_model)
-                elif hasattr(generator, '_select_claude_model'):
-                    generator._select_claude_model(initial_model)
-                    
-                if generated_code := self._try_single_generation(generator, prompt, attempt, version):
-                    return generated_code
-                    
-            except ValueError as e:
-                last_error = str(e)
-                self.log.error(f"Generation attempt {attempt + 1} failed: {e}")
-                
-                # Build error prompt with last code and error
-                if "Model returned no code" in str(e):
-                    # If no code was returned, try a simpler prompt
-                    prompt = self._build_simpler_prompt(original_prompt)
-                    self.log.debug(f"\n=== SIMPLIFIED PROMPT ===\n{prompt}\n==================\n")
-                else:
-                    # Otherwise use the error prompt with the last code
-                    prompt = self._build_error_prompt(last_code, last_error)
-                    self.log.debug(f"\n=== ERROR PROMPT ===\n{prompt}\n==================\n")
-                    
-            except Exception as e:
-                last_error = str(e)
-                self.log.error(f"Unexpected error in attempt {attempt + 1}: {e}")
-                prompt = self._build_error_prompt(last_code, str(e))
-                self.log.debug(f"\n=== ERROR PROMPT ===\n{prompt}\n==================\n")
-                
-            finally:
-                if 'generated_code' in locals():
-                    last_code = generated_code
-        
-        self.log.error("Failed to generate valid code after all attempts")
-        return None
-    
-    def _try_single_generation(self, generator, prompt: str, attempt: int, version: int) -> Optional[str]:
+    def _attempt_code_generation(self, technique_names: str, next_version: int) -> Optional[str]:
         """Single attempt at code generation with validation"""
         try:
-            temperature = 0.85 + (attempt * 0.05)
-            if isinstance(generator, OpenAI4OGenerator):
-                raw_code = generator.generate_with_ai(prompt, temperature)
-            else:
-                raw_code = generator.generate_with_ai(prompt)
+            # Get generator and set model
+            generator = self.ai_generators[self._current_model]
+            if hasattr(generator, '_select_claude_model'):
+                generator._select_claude_model(self._current_model)
             
+            # Special handling for Flux model
+            if self._current_model == 'flux':
+                # For Flux, we just need to generate the image
+                prompt = ", ".join(technique_names)
+                result = generator.generate_with_ai(prompt)
+                if result:
+                    return "Image generated successfully"  # Dummy code for Flux model
+                return None
+            
+            # Build generation prompt with proper markers
+            prompt = f"""// Required function stubs - fill with your code
+void initSketch() {{
+    // Initialize variables and setup here
+}}
+
+void runSketch(float progress) {{
+    // Animation code using progress (0.0 to 1.0) here
+}}
+
+
+=== PROCESSING SKETCH GENERATOR ===
+Create a visually appealing processing animation that loops smoothly over 6 seconds.
+Let your creativity guide the direction - feel free to explore and experiment.
+
+=== REQUIRED FUNCTIONS ===
+You MUST define these two functions:
+1. void initSketch() - Called once at start
+2. void runSketch(float progress) - Called each frame with progress (0.0 to 1.0)
+
+=== SYSTEM FRAMEWORK ===
+The system automatically handles these - DO NOT include them:
+• void setup() or draw() functions
+• size(1080, 1080) and frameRate settings
+• background(0) or any background clearing
+• translate(width/2, height/2) for centering
+• Frame saving and program exit
+
+=== CODE STRUCTURE ===
+1. Define any classes at the top
+2. Declare global variables
+3. Define initSketch() for setup
+4. Define runSketch(progress) for animation
+• The canvas is already centered at (0,0)
+• Initialize all variables with values
+• Use RGB values for colors (e.g., stroke(255, 0, 0) for red)
+
+=== CREATIVE DIRECTION ===
+• Required Techniques: {technique_names}
+
+=== ANIMATION GUIDELINES ===
+• Use the progress variable (0.0 to 1.0) for ALL animations
+• Ensure smooth looping by matching start/end states
+• Use map() to convert progress to specific ranges
+• Use lerp() or lerpColor() for smooth transitions
+• Avoid sudden jumps or discontinuities
+• Consider easing functions for natural motion
+• Test values at progress = 0.0, 0.5, and 1.0
+
+=== IMPORTANT RULES ===
+1. DO NOT define duplicate methods with the same signature
+2. Each method overload must have different parameter types
+3. Use descriptive method names to avoid conflicts
+4. Return your code between these exact markers:
+// YOUR CREATIVE CODE GOES HERE
+[your code here]
+// END OF YOUR CREATIVE CODE"""
+
+            # Generate code with the model
+            raw_code = generator.generate_with_ai(prompt)
             if not raw_code:
-                self.log.warning(f"Attempt {attempt + 1}: AI returned no code")
-                raise ValueError("Model returned no code")  # Convert to ValueError to trigger retry
+                return None
             
-            # Use centralized validation with retry logic
-            is_valid, error, guidance = self.validator.validate_with_retry(raw_code, attempt)
-            if not is_valid:
-                if guidance:
-                    self.log.debug(f"\n=== VALIDATION GUIDANCE ===\n{guidance}\n==================\n")
-                raise ValueError(error)
-                
-            return raw_code
+            # Clean and validate the code
+            cleaned_code = self.validator.clean_code(raw_code)
+            if not cleaned_code:
+                return None
+            
+            # Check for duplicate method signatures
+            if self._has_duplicate_methods(cleaned_code):
+                self.log.warning("Detected duplicate method signatures, retrying with simpler code")
+                return None
+            
+            return cleaned_code
             
         except Exception as e:
-            self.log.error(f"Error in single generation attempt: {str(e)}")
+            self.log.error(f"Error in code generation attempt: {e}")
+            if self.config.debug_mode:
+                import traceback
+                self.log.debug(traceback.format_exc())
             return None
+    
+    def _has_duplicate_methods(self, code: str) -> bool:
+        """Check for duplicate method signatures in the code"""
+        try:
+            # Extract method signatures using regex
+            method_pattern = r'(?:public\s+|private\s+)?(?:static\s+)?(\w+)\s+(\w+)\s*\(([\w\s,<>[\]]*)\)'
+            methods = re.finditer(method_pattern, code)
+            
+            # Store signatures for comparison
+            signatures = set()
+            for match in methods:
+                return_type = match.group(1)
+                method_name = match.group(2)
+                params = match.group(3).strip()
+                
+                # Create normalized signature
+                signature = f"{method_name}({params})"
+                
+                # Check if we've seen this signature before
+                if signature in signatures:
+                    return True
+                signatures.add(signature)
+            
+            return False
+            
+        except Exception as e:
+            self.log.error(f"Error checking for duplicate methods: {e}")
+            return False
     
     # === Code Processing and Validation ===
     def _clean_code(self, code: str, version: int) -> str:
@@ -329,55 +377,107 @@ class ProcessingGenerator:
     
     # === Prompt Building ===
     def _build_error_prompt(self, code: str, error_msg: str = None) -> str:
-        """Build error prompt for retry attempts"""
+        """Build error prompt for retry attempts with improved guidance"""
         specific_guidance = self._get_error_guidance(error_msg)
+        
+        # Extract key error patterns
+        error_patterns = {
+            "NullPointerException": "• Check all variables are initialized before use\n• Verify object creation in initSketch()",
+            "ArrayIndexOutOfBounds": "• Verify array indices are within bounds\n• Check array initialization sizes",
+            "cannot find symbol": "• Ensure all variables are declared\n• Check for typos in variable names",
+            "incompatible types": "• Verify variable type assignments\n• Check function return types",
+            "Missing semicolon": "• Add missing semicolons at line ends\n• Check statement termination",
+            "letterMask": "• Initialize letterMask in initSketch()\n• Follow text rendering sequence",
+            "translate": "• Remove translate() calls\n• Use relative coordinates from (0,0)",
+            "setup": "• Remove setup() and draw()\n• Use only initSketch() and runSketch()",
+        }
+        
+        # Build targeted guidance based on error patterns
+        targeted_guidance = []
+        if error_msg:
+            for pattern, guidance in error_patterns.items():
+                if pattern.lower() in error_msg.lower():
+                    targeted_guidance.append(guidance)
         
         error_context = f"""Previous attempt had issues that need to be fixed:
 ERROR: {error_msg if error_msg else 'Unknown error'}
 
-GUIDANCE:
+SPECIFIC GUIDANCE:
 {specific_guidance}
 
-Previous code for reference:
-{code if code else '(No code was generated)'}
+{f'TARGETED FIXES:\\n{chr(10).join(targeted_guidance)}' if targeted_guidance else ''}
 
-REQUIREMENTS:
+GENERAL REQUIREMENTS:
 1. Return ONLY the creative code between the markers
 2. DO NOT include setup(), draw(), or other framework code
 3. Use only the provided progress variable (0.0 to 1.0) for animation
 4. Keep code focused and efficient
+5. Initialize all variables in initSketch()
+6. Use proper Processing syntax and functions
+
+Previous code for reference:
+{code if code else '(No code was generated)'}
 
 Please fix these issues and return the corrected code."""
         
         return error_context
     
     def _get_error_guidance(self, error_msg: str) -> str:
-        """Get specific guidance based on error type"""
+        """Get specific guidance based on error type with improved patterns"""
         if not error_msg:
-            return "• Try a simpler approach with cleaner code structure"
+            return "• Try a simpler approach with cleaner code structure\n• Focus on core functionality"
         
-        if "Contains translate()" in error_msg:
-            return """• DO NOT use translate() - all positioning should be relative to canvas center (0,0)
+        # Common error patterns and their specific guidance
+        error_patterns = {
+            "translate": """• DO NOT use translate() - all positioning should be relative to canvas center (0,0)
 • Use direct x,y coordinates: x = width/2 + offset
 • For rotations, use rotate() with pushMatrix/popMatrix
-• Remember the canvas is already centered"""
-        
-        if "Creative validation" in error_msg:
-            return """• Remove any setup/draw function declarations
+• Remember the canvas is already centered""",
+            
+            "Creative validation": """• Remove any setup/draw function declarations
 • Ensure no background or translate calls
 • Use only the provided progress variable
-• Keep code focused on the creative elements"""
-        
-        if "Core validation" in error_msg:
-            return """• Ensure code fits within the template structure
+• Keep code focused on the creative elements
+• Initialize all variables in initSketch()""",
+            
+            "Core validation": """• Ensure code fits within the template structure
 • Check for proper loop completion
 • Verify all variables are properly scoped
-• Remove any conflicting declarations"""
+• Remove any conflicting declarations
+• Use Processing-specific syntax""",
+            
+            "letterMask": """• Declare PGraphics letterMask at the top
+• Initialize in initSketch() with createGraphics()
+• Use proper text rendering sequence
+• Check text positioning and size""",
+            
+            "NullPointerException": """• Initialize all variables before use
+• Check object creation in initSketch()
+• Verify array/list initialization
+• Debug variable scope issues""",
+            
+            "ArrayIndexOutOfBounds": """• Check array size calculations
+• Verify index bounds in loops
+• Initialize arrays with proper size
+• Use array.length or list.size() for bounds""",
+        }
         
+        # Find matching patterns and combine guidance
+        guidance = []
+        for pattern, specific_guidance in error_patterns.items():
+            if pattern.lower() in error_msg.lower():
+                guidance.append(specific_guidance)
+        
+        if guidance:
+            return "\n\n".join(guidance)
+        
+        # Default guidance for unknown errors
         return """• Simplify the implementation
 • Focus on core functionality
 • Ensure clean mathematical relationships
-• Remove any potential conflicts"""
+• Remove any potential conflicts
+• Check variable initialization
+• Verify Processing syntax"""
     
     # === File Operations ===
     def _save_code(self, code: str, version: int) -> None:
@@ -402,6 +502,7 @@ Please fix these issues and return the corrected code."""
         """Build Processing template with proper code structure"""
         return f"""// === USER'S CREATIVE CODE ===
 // YOUR CREATIVE CODE GOES HERE
+[your code here]
 // END OF YOUR CREATIVE CODE
 
 // === SYSTEM FRAMEWORK ===
